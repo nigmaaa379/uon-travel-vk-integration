@@ -1,46 +1,5 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-
-const EMPTY = { sessions: {}, processedEvents: {} };
-
-export class JsonStore {
-  #file;
-  #data = structuredClone(EMPTY);
-  #queue = Promise.resolve();
-
-  constructor(file) { this.#file = file; }
-
-  async init() {
-    await mkdir(dirname(this.#file), { recursive: true });
-    try { this.#data = JSON.parse(await readFile(this.#file, 'utf8')); }
-    catch (error) { if (error.code !== 'ENOENT') throw error; await this.#persist(); }
-  }
-
-  getSession(userId) { return structuredClone(this.#data.sessions[userId] || null); }
-  isProcessed(eventId) { return Boolean(this.#data.processedEvents[eventId]); }
-
-  async saveSession(userId, session) {
-    this.#data.sessions[userId] = structuredClone(session);
-    await this.#persistQueued();
-  }
-
-  async markProcessed(eventId) {
-    this.#data.processedEvents[eventId] = Date.now();
-    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    for (const [id, timestamp] of Object.entries(this.#data.processedEvents)) {
-      if (timestamp < cutoff) delete this.#data.processedEvents[id];
-    }
-    await this.#persistQueued();
-  }
-
-  #persistQueued() {
-    this.#queue = this.#queue.then(() => this.#persist());
-    return this.#queue;
-  }
-
-  async #persist() {
-    const temp = `${this.#file}.tmp`;
-    await writeFile(temp, JSON.stringify(this.#data, null, 2), { mode: 0o600 });
-    await rename(temp, this.#file);
-  }
-}
+import { randomUUID } from 'node:crypto';
+const EMPTY = { sessions: {}, botSessions: {}, processedEvents: {}, subscriptions: [], offers: {} };
+export class JsonStore { #file; #data = structuredClone(EMPTY); #queue = Promise.resolve(); constructor(file) { this.#file = file; } async init() { await mkdir(dirname(this.#file), { recursive: true }); try { this.#data = { ...structuredClone(EMPTY), ...JSON.parse(await readFile(this.#file, 'utf8')) }; } catch (e) { if (e.code !== 'ENOENT') throw e; await this.#persist(); } } getSession(id) { return structuredClone(this.#data.sessions[id] || null); } async saveSession(id, value) { this.#data.sessions[id] = structuredClone(value); await this.#persistQueued(); } getBotSession(id) { return structuredClone(this.#data.botSessions[id] || null); } async saveBotSession(id, value) { this.#data.botSessions[id] = structuredClone(value); await this.#persistQueued(); } async clearBotSession(id) { delete this.#data.botSessions[id]; await this.#persistQueued(); } isProcessed(id) { return Boolean(this.#data.processedEvents[id]); } async markProcessed(id) { this.#data.processedEvents[id] = Date.now(); const cutoff = Date.now() - 7 * 86400000; for (const [key, ts] of Object.entries(this.#data.processedEvents)) if (ts < cutoff) delete this.#data.processedEvents[key]; await this.#persistQueued(); } async addSubscription({ platform, userId, params }) { const existing = this.#data.subscriptions.find((s) => s.platform === platform && s.userId === userId && JSON.stringify(s.params) === JSON.stringify(params)); if (existing) return existing; const item = { id: randomUUID(), platform, userId, params, active: true, sentOfferIds: [], createdAt: Date.now() }; this.#data.subscriptions.push(item); await this.#persistQueued(); return item; } listSubscriptions() { return structuredClone(this.#data.subscriptions.filter((s) => s.active)); } async markSubscriptionSent(id, offerIds) { const item = this.#data.subscriptions.find((s) => s.id === id); if (item) { item.sentOfferIds = [...new Set([...item.sentOfferIds, ...offerIds])].slice(-100); item.lastRunAt = Date.now(); await this.#persistQueued(); } } async saveOffer(offer) { this.#data.offers[offer.id] = { ...structuredClone(offer), savedAt: Date.now() }; await this.#persistQueued(); } getOffer(id) { return structuredClone(this.#data.offers[id] || null); } #persistQueued() { this.#queue = this.#queue.then(() => this.#persist()); return this.#queue; } async #persist() { const temp = `${this.#file}.tmp`; await writeFile(temp, JSON.stringify(this.#data, null, 2), { mode: 0o600 }); await rename(temp, this.#file); } }

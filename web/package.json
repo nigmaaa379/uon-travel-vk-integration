@@ -1,0 +1,1 @@
+{"name":"sbezhim-na-more-site","private":true,"type":"module","scripts":{"build:css":"tailwindcss -i ./src/tailwind.css -o ./assets/tailwind.css --minify","watch:css":"tailwindcss -i ./src/tailwind.css -o ./assets/tailwind.css --watch"},"devDependencies":{"tailwindcss":"^3.4.17"}}

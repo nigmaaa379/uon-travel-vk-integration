@@ -1,14 +1,14 @@
 {
   "name": "uon-travel-vk-integration",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "VK chatbot qualification flow integrated with U-ON Travel leads and instant notifications",
+  "description": "VK, Telegram, MAX, U-ON Travel and premium travel website integration",
   "engines": { "node": ">=20" },
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test",
-    "check": "node --check src/*.js"
+    "test": "node --test test/*.test.js",
+    "check": "node --check src/*.js && node --check web/assets/app.js"
   }
 }

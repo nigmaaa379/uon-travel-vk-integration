@@ -11,7 +11,7 @@ export function loadConfig() {
     vk: { groupId: required('VK_GROUP_ID'), confirmationCode: required('VK_CONFIRMATION_CODE'), secret: required('VK_CALLBACK_SECRET'), token: required('VK_GROUP_TOKEN'), apiVersion: process.env.VK_API_VERSION || '5.199' },
     telegram: { token: required('TELEGRAM_BOT_TOKEN'), webhookSecret: required('TELEGRAM_WEBHOOK_SECRET') },
     max: { token: required('MAX_BOT_TOKEN'), webhookSecret: required('MAX_WEBHOOK_SECRET'), apiUrl: httpsUrl('MAX_API_URL', 'https://platform-api2.max.ru') },
-    uon: { apiKey: required('UON_API_KEY'), source: process.env.UON_SOURCE || 'Чат-бот', commentField: process.env.UON_COMMENT_FIELD || 'note', timeoutMs: integer('UON_TIMEOUT_MS', 10000, { min: 1000, max: 120000 }), retries: integer('UON_RETRIES', 3, { min: 0, max: 10 }) },
+    uon: { apiKey: required('UON_API_KEY'), source: process.env.UON_SOURCE || 'Чат-бот', commentField: process.env.UON_COMMENT_FIELD || 'note', managerId: integer('UON_MANAGER_ID', 3, { min: 1 }), timeoutMs: integer('UON_TIMEOUT_MS', 10000, { min: 1000, max: 120000 }), retries: integer('UON_RETRIES', 3, { min: 0, max: 10 }) },
     email: { apiKey: required('RESEND_API_KEY'), from: required('NOTIFY_EMAIL_FROM'), to: required('NOTIFY_EMAIL_TO').split(',').map((x) => x.trim()).filter(Boolean) },
     notifierTelegram: { botToken: required('NOTIFY_TELEGRAM_BOT_TOKEN'), chatId: required('NOTIFY_TELEGRAM_CHAT_ID') },
     tourvisor: {

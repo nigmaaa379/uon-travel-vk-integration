@@ -1,0 +1,114 @@
+name: Complete cookie consent
+on:
+  push:
+    paths:
+      - '.github/workflows/complete-cookie-consent.yml'
+permissions:
+  contents: write
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Implement cookie preferences
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          index=Path('web/index.html')
+          html=index.read_text()
+          old='<div class="cookie-banner" id="cookie-banner" role="dialog" aria-label="Уведомление о cookie"><p>Мы используем cookie и Яндекс Метрику. Подробнее — в <a href="/legal/privacy.html">политике конфиденциальности</a>.</p><button class="btn primary" id="accept-cookies">Принять</button></div>'
+          new='<div class="cookie-banner" id="cookie-banner" role="dialog" aria-label="Настройки cookie" aria-live="polite"><p>Необходимые cookie обеспечивают работу сайта. Яндекс Метрика включается только с вашего согласия. Подробнее — в <a href="/legal/privacy.html">политике конфиденциальности</a>.</p><div class="cookie-actions"><button class="btn primary" id="accept-cookies" type="button">Принять</button><button class="btn cookie-reject" id="reject-cookies" type="button">Отклонить необязательные</button></div></div>'
+          if old not in html: raise SystemExit('Cookie banner pattern not found')
+          html=html.replace(old,new)
+          footer='«Информация на сайте носит исключительно информационный характер и не является публичной офертой. Окончательная стоимость услуг уточняется при бронировании».</p></div></footer>'
+          footer_new='«Информация на сайте носит исключительно информационный характер и не является публичной офертой. Окончательная стоимость услуг уточняется при бронировании».</p></div><div class="wrap cookie-preferences"><button type="button" id="cookie-settings">Настройки cookie</button></div></footer>'
+          if footer not in html: raise SystemExit('Footer pattern not found')
+          index.write_text(html.replace(footer,footer_new))
+
+          app=Path('web/assets/app.js')
+          js=app.read_text()
+          old_js="const cookie=qs('#cookie-banner');if(cookie&&!localStorage.getItem('seaEscapeCookieConsent'))requestAnimationFrame(()=>cookie.classList.add('visible'));qs('#accept-cookies')?.addEventListener('click',()=>{localStorage.setItem('seaEscapeCookieConsent',new Date().toISOString());cookie.classList.remove('visible');window.dispatchEvent(new CustomEvent('analytics-consent-granted'))});"
+          new_js="""const COOKIE_CONSENT_KEY='seaEscapeCookieConsent';
+const readCookieConsent=()=>{try{const value=localStorage.getItem(COOKIE_CONSENT_KEY);if(!value)return null;if(value==='accepted'||value==='rejected')return value;return 'accepted'}catch{return null}};
+const writeCookieConsent=value=>{try{localStorage.setItem(COOKIE_CONSENT_KEY,value)}catch{}};
+const cookie=qs('#cookie-banner');
+const showCookieSettings=()=>cookie?.classList.add('visible');
+const hideCookieSettings=()=>cookie?.classList.remove('visible');
+if(cookie&&!readCookieConsent())requestAnimationFrame(showCookieSettings);
+qs('#accept-cookies')?.addEventListener('click',()=>{writeCookieConsent('accepted');hideCookieSettings();window.dispatchEvent(new CustomEvent('analytics-consent-granted'))});
+qs('#reject-cookies')?.addEventListener('click',()=>{writeCookieConsent('rejected');hideCookieSettings();window.dispatchEvent(new CustomEvent('analytics-consent-denied'))});
+qs('#cookie-settings')?.addEventListener('click',showCookieSettings);"""
+          if old_js not in js: raise SystemExit('Cookie JS pattern not found')
+          js=js.replace(old_js,new_js)
+          old_metrika="""const YANDEX_METRIKA_ID=110979041;
+function loadYandexMetrika(){
+  if(window.ym||document.querySelector(`script[data-yandex-metrika=\"${YANDEX_METRIKA_ID}\"]`))return;
+  window.ym=window.ym||function(){(window.ym.a=window.ym.a||[]).push(arguments)};
+  window.ym.l=Date.now();
+  const script=document.createElement('script');
+  script.async=true;
+  script.dataset.yandexMetrika=String(YANDEX_METRIKA_ID);
+  script.src='https:'+'//mc.yandex.ru/metrika/tag.js?id='+YANDEX_METRIKA_ID;
+  document.head.append(script);
+  window.ym(YANDEX_METRIKA_ID,'init',{ssr:true,webvisor:true,clickmap:true,ecommerce:'dataLayer',referrer:document.referrer,url:location.href,accurateTrackBounce:true,trackLinks:true});
+}
+if(localStorage.getItem('seaEscapeCookieConsent'))loadYandexMetrika();
+window.addEventListener('analytics-consent-granted',loadYandexMetrika,{once:true});
+"""
+          new_metrika="""const YANDEX_METRIKA_ID=110979041;
+function loadYandexMetrika(){
+  if(readCookieConsent()!=='accepted'||window.__yandexMetrikaLoaded)return;
+  if(document.querySelector(`script[data-yandex-metrika=\"${YANDEX_METRIKA_ID}\"]`))return;
+  window.ym=window.ym||function(){(window.ym.a=window.ym.a||[]).push(arguments)};
+  window.ym.l=Date.now();
+  const script=document.createElement('script');
+  script.async=true;
+  script.dataset.yandexMetrika=String(YANDEX_METRIKA_ID);
+  script.src='https:'+'//mc.yandex.ru/metrika/tag.js?id='+YANDEX_METRIKA_ID;
+  document.head.append(script);
+  window.__yandexMetrikaLoaded=true;
+  window.ym(YANDEX_METRIKA_ID,'init',{ssr:true,webvisor:true,clickmap:true,ecommerce:'dataLayer',referrer:document.referrer,url:location.href,accurateTrackBounce:true,trackLinks:true});
+}
+function stopYandexMetrika(){
+  if(window.__yandexMetrikaLoaded&&typeof window.ym==='function'){try{window.ym(YANDEX_METRIKA_ID,'destruct')}catch{}}
+  document.querySelector(`script[data-yandex-metrika=\"${YANDEX_METRIKA_ID}\"]`)?.remove();
+  window.__yandexMetrikaLoaded=false;
+  try{delete window.ym}catch{window.ym=undefined}
+}
+if(readCookieConsent()==='accepted')loadYandexMetrika();
+window.addEventListener('analytics-consent-granted',loadYandexMetrika);
+window.addEventListener('analytics-consent-denied',stopYandexMetrika);
+"""
+          if old_metrika not in js: raise SystemExit('Metrika pattern not found')
+          app.write_text(js.replace(old_metrika,new_metrika))
+
+          css=Path('web/assets/styles.css')
+          styles=css.read_text()
+          addition="""
+.cookie-actions{display:flex;flex-wrap:wrap;gap:10px}.cookie-reject{background:#eef4f5;color:var(--deep);border-color:#b8d0d5}.cookie-reject:hover{background:#dfeaec}.cookie-preferences{padding-bottom:24px}.cookie-preferences button{border:0;background:none;color:#c2d9de;text-decoration:underline;cursor:pointer;padding:0}.cookie-preferences button:hover{color:white}@media(max-width:560px){.cookie-banner{align-items:stretch;flex-direction:column}.cookie-actions{display:grid}.cookie-actions .btn{width:100%}}
+"""
+          if '.cookie-actions{' not in styles: css.write_text(styles.rstrip()+addition)
+
+          privacy=Path('web/legal/privacy.html')
+          policy=privacy.read_text()
+          old_policy='Имя, телефон, email, параметры путешествия, технические cookie и сведения о взаимодействии с сайтом.'
+          new_policy='Имя, телефон, email, параметры путешествия и необходимые технические cookie. Аналитические cookie Яндекс Метрики используются только после согласия пользователя. Пользователь может отклонить их или изменить выбор через кнопку «Настройки cookie» в подвале сайта.'
+          if old_policy not in policy: raise SystemExit('Privacy policy pattern not found')
+          privacy.write_text(policy.replace(old_policy,new_policy))
+
+          Path('test/cookie-consent.test.js').write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\nimport { readFile } from "node:fs/promises";\n\ntest("supports accept, reject and reopening cookie settings", async () => {\n  const html = await readFile(new URL("../web/index.html", import.meta.url), "utf8");\n  const script = await readFile(new URL("../web/assets/app.js", import.meta.url), "utf8");\n  assert.match(html, /id="accept-cookies"/);\n  assert.match(html, /id="reject-cookies"/);\n  assert.match(html, /id="cookie-settings"/);\n  assert.match(script, /writeCookieConsent\\('accepted'\\)/);\n  assert.match(script, /writeCookieConsent\\('rejected'\\)/);\n  assert.match(script, /analytics-consent-denied/);\n});\n\ntest("does not load Metrika without explicit acceptance", async () => {\n  const script = await readFile(new URL("../web/assets/app.js", import.meta.url), "utf8");\n  assert.match(script, /readCookieConsent\\(\\)!=='accepted'/);\n  assert.match(script, /if\\(readCookieConsent\\(\\)==='accepted'\\)loadYandexMetrika\\(\\)/);\n  assert.match(script, /YANDEX_METRIKA_ID,'destruct'/);\n  assert.doesNotMatch(script, /if\\(localStorage\\.getItem\\('seaEscapeCookieConsent'\\)\\)loadYandexMetrika/);\n});\n''')
+          PY
+      - name: Test
+        run: npm test
+      - name: Commit
+        run: |
+          rm -f .github/workflows/complete-cookie-consent.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat(site): завершить управление cookie consent'
+          git push

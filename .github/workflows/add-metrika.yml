@@ -1,0 +1,59 @@
+name: Add Yandex Metrika
+on:
+  push:
+    paths:
+      - '.github/workflows/add-metrika.yml'
+permissions:
+  contents: write
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Add consent-aware counter
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          app=Path('web/assets/app.js')
+          text=app.read_text()
+          loader='''
+          const YANDEX_METRIKA_ID=110979041;
+          function loadYandexMetrika(){
+            if(window.ym||document.querySelector(`script[data-yandex-metrika="${YANDEX_METRIKA_ID}"]`))return;
+            window.ym=window.ym||function(){(window.ym.a=window.ym.a||[]).push(arguments)};
+            window.ym.l=Date.now();
+            const script=document.createElement('script');
+            script.async=true;
+            script.dataset.yandexMetrika=String(YANDEX_METRIKA_ID);
+            script.src='https:'+'//mc.yandex.ru/metrika/tag.js?id='+YANDEX_METRIKA_ID;
+            document.head.append(script);
+            window.ym(YANDEX_METRIKA_ID,'init',{ssr:true,webvisor:true,clickmap:true,ecommerce:'dataLayer',referrer:document.referrer,url:location.href,accurateTrackBounce:true,trackLinks:true});
+          }
+          if(localStorage.getItem('seaEscapeCookieConsent'))loadYandexMetrika();
+          window.addEventListener('analytics-consent-granted',loadYandexMetrika,{once:true});
+          '''
+          if 'const YANDEX_METRIKA_ID=' not in text:
+              app.write_text(text.rstrip()+'\n'+loader)
+          server=Path('src/app.js')
+          text=server.read_text()
+          old="img-src 'self' data: https://images.unsplash.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self';"
+          new="img-src 'self' data: https://images.unsplash.com https://mc.yandex.ru https://mc.yandex.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://mc.yandex.ru https://mc.yandex.com; connect-src 'self' https://mc.yandex.ru https://mc.yandex.com;"
+          if old not in text:
+              raise SystemExit('CSP pattern not found')
+          server.write_text(text.replace(old,new))
+          Path('test/yandex-metrika.test.js').write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\nimport { readFile } from "node:fs/promises";\n\ntest("loads Yandex Metrika only after analytics consent", async () => {\n  const script = await readFile(new URL("../web/assets/app.js", import.meta.url), "utf8");\n  assert.match(script, /YANDEX_METRIKA_ID\\s*=\\s*110979041/);\n  assert.match(script, /seaEscapeCookieConsent/);\n  assert.match(script, /analytics-consent-granted/);\n  assert.match(script, /mc\\.yandex\\.ru\\/metrika\\/tag\\.js/);\n});\n\ntest("allows Yandex Metrika in CSP", async () => {\n  const server = await readFile(new URL("../src/app.js", import.meta.url), "utf8");\n  assert.match(server, /script-src[^;]*https:\\/\\/mc\\.yandex\\.ru/);\n  assert.match(server, /connect-src[^;]*https:\\/\\/mc\\.yandex\\.ru/);\n  assert.match(server, /img-src[^;]*https:\\/\\/mc\\.yandex\\.ru/);\n});\n''')
+          PY
+      - name: Test
+        run: npm test
+      - name: Commit
+        run: |
+          rm -f .github/workflows/add-metrika.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat(site): подключить Яндекс Метрику с согласием'
+          git push

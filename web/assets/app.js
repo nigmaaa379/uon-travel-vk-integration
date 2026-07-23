@@ -2,3 +2,18 @@ const qs=(s,c=document)=>c.querySelector(s);const qsa=(s,c=document)=>[...c.quer
 const defaultSalesAccents=[{label:'Тур дня',title:'Семейная Турция',text:'Отели с продуманной детской инфраструктурой и комфортным перелётом.',button:'Узнать варианты'},{label:'На этой неделе выбирают',title:'ОАЭ и Таиланд',text:'Тёплое море, семейные номера и насыщенный досуг для любого возраста.',button:'Получить подборку'},{label:'Персональный подбор',title:'Отдых под ваш ритм',text:'Сравним предложения и объясним, за что действительно стоит платить.',button:'Обсудить поездку'}];
 function salesCard(item){const article=document.createElement('article');article.className='sales-accent';const label=document.createElement('span');label.className='sales-accent-label';label.textContent=item.label;const title=document.createElement('h3');title.textContent=item.title;const text=document.createElement('p');text.textContent=item.text;const button=document.createElement('button');button.className='sales-accent-link';button.type='button';button.textContent=item.button||'Подробнее';button.addEventListener('click',()=>{modal?.showModal();document.body.classList.add('modal-open')});article.append(label,title,text,button);return article}
 async function enhanceLanding(){const search=qs('#search .wrap');const widget=qs('#search .widget');if(!search||!widget)return;const stylesheet=document.createElement('link');stylesheet.rel='stylesheet';stylesheet.href='/assets/sales-accents.css';document.head.append(stylesheet);qsa('.hero .trust li').find(item=>item.textContent.trim()==='Сопровождение в поездке')?.replaceChildren('Забота 24/7');const serviceStep=qsa('#about .steps li').find(item=>item.querySelector('h3')?.textContent.trim()==='Сопровождаем до дома'||item.querySelector('h3')?.textContent.trim()==='Полный сервис');if(serviceStep){serviceStep.querySelector('h3').textContent='Полный сервис';serviceStep.querySelector('p').textContent='Трансферы, визы, досуг (экскурсии, концерты, гастро-туры и т.д.)'}const familyPhoto=qs('#about .photo>img');if(familyPhoto){familyPhoto.src='https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=1200&q=86';familyPhoto.alt='Семья на отдыхе в тропической стране';familyPhoto.style.objectPosition='center'}let items=defaultSalesAccents;try{const response=await fetch('/data/sales-accents.json',{cache:'no-store'});if(response.ok){const parsed=await response.json();if(Array.isArray(parsed)&&parsed.length)items=parsed.slice(0,3)}}catch{}const layout=document.createElement('div');layout.className='tour-search-layout';const rail=document.createElement('aside');rail.className='sales-rail';rail.setAttribute('aria-label','Актуальные предложения');items.forEach(item=>rail.append(salesCard(item)));widget.parentNode.insertBefore(layout,widget);layout.append(rail,widget)}enhanceLanding();
+
+const YANDEX_METRIKA_ID=110979041;
+function loadYandexMetrika(){
+  if(window.ym||document.querySelector(`script[data-yandex-metrika="${YANDEX_METRIKA_ID}"]`))return;
+  window.ym=window.ym||function(){(window.ym.a=window.ym.a||[]).push(arguments)};
+  window.ym.l=Date.now();
+  const script=document.createElement('script');
+  script.async=true;
+  script.dataset.yandexMetrika=String(YANDEX_METRIKA_ID);
+  script.src='https:'+'//mc.yandex.ru/metrika/tag.js?id='+YANDEX_METRIKA_ID;
+  document.head.append(script);
+  window.ym(YANDEX_METRIKA_ID,'init',{ssr:true,webvisor:true,clickmap:true,ecommerce:'dataLayer',referrer:document.referrer,url:location.href,accurateTrackBounce:true,trackLinks:true});
+}
+if(localStorage.getItem('seaEscapeCookieConsent'))loadYandexMetrika();
+window.addEventListener('analytics-consent-granted',loadYandexMetrika,{once:true});

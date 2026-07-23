@@ -1,0 +1,1 @@
+Activate the completed cookie consent implementation.

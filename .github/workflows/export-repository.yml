@@ -1,0 +1,26 @@
+name: Export repository snapshot
+on:
+  push:
+    paths:
+      - '.github/workflows/export-repository.yml'
+permissions:
+  contents: write
+jobs:
+  export:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Create tracked-files snapshot
+        run: |
+          git ls-files -z | tar --null -czf /tmp/repository-snapshot.tar.gz --files-from=-
+          base64 -w 0 /tmp/repository-snapshot.tar.gz > repository-snapshot.b64
+      - name: Commit snapshot
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add repository-snapshot.b64
+          git commit -m 'chore: создать снимок для переноса'
+          git push

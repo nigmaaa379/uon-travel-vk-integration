@@ -70,6 +70,6 @@ export function validateLegalDocument(body) {
 }
 
 export function renderLegalDocument(document) {
-  const canonical = document.slug === 'privacy' ? 'https://tursbezhimnamore.ru/page/privacy' : `https://tursbezhimnamore.ru/legal/${document.slug}.html`;
+  const canonical = document.slug === 'privacy' ? 'https://tursbezhimnamore.ru/page/privacy' : 'https://tursbezhimnamore.ru/legal/' + document.slug + '.html';
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeText(document.title)} — Сбежим на море</title><meta name="description" content="${escapeAttr(document.label)} турагентства Сбежим на море."><link rel="canonical" href="${canonical}"><link rel="stylesheet" href="/assets/styles.css"></head><body class="legal-page"><header class="legal-header"><div class="wrap"><a class="brand" href="/"><b>Сбежим на море</b><span>Турагентство онлайн</span></a></div></header><main class="wrap"><article class="legal-content"><a class="legal-back" href="/">← Вернуться на сайт</a><h1>${escapeText(document.title)}</h1><p><b>Редакция от ${formatDateRu(document.version)}</b></p>${document.contentHtml}</article></main></body></html>`;
 }

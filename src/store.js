@@ -2,11 +2,11 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const EMPTY = { sessions: {}, botSessions: {}, processedEvents: {}, subscriptions: [], offers: {} };
+const EMPTY = { sessions: {}, botSessions: {}, processedEvents: {}, subscriptions: [], offers: {}, consentEvidence: [] };
 export class JsonStore {
   #file; #data = structuredClone(EMPTY); #queue = Promise.resolve();
   constructor(file) { this.#file = file; }
-  async init() { await mkdir(dirname(this.#file), { recursive: true }); try { this.#data = { ...structuredClone(EMPTY), ...JSON.parse(await readFile(this.#file, 'utf8')) }; } catch (e) { if (e.code !== 'ENOENT') throw e; await this.#persist(); } }
+  async init() { await mkdir(dirname(this.#file), { recursive: true }); try { this.#data = { ...structuredClone(EMPTY), ...JSON.parse(await readFile(this.#file, 'utf8')) }; if (!Array.isArray(this.#data.consentEvidence)) this.#data.consentEvidence = []; } catch (e) { if (e.code !== 'ENOENT') throw e; await this.#persist(); } }
   getSession(id) { return structuredClone(this.#data.sessions[id] || null); }
   async saveSession(id, value) { this.#data.sessions[id] = structuredClone(value); await this.#persistQueued(); }
   getBotSession(id) { return structuredClone(this.#data.botSessions[id] || null); }
@@ -42,6 +42,23 @@ export class JsonStore {
   async markSubscriptionSent(id, offerIds) { const item = this.#data.subscriptions.find((s) => s.id === id); if (item) { item.sentOfferIds = [...new Set([...item.sentOfferIds, ...offerIds])].slice(-100); item.lastRunAt = Date.now(); await this.#persistQueued(); } }
   async saveOffer(offer) { this.#data.offers[offer.id] = { ...structuredClone(offer), savedAt: Date.now() }; await this.#persistQueued(); }
   getOffer(id) { return structuredClone(this.#data.offers[id] || null); }
+  async saveConsentEvidence(record) {
+    const item = { evidenceId: record.evidenceId || randomUUID(), revokedAt: null, revocationReason: null, ...structuredClone(record) };
+    this.#data.consentEvidence.push(item);
+    await this.#persistQueued();
+    return structuredClone(item);
+  }
+  listConsentEvidence({ uonLeadId, evidenceId } = {}) {
+    return structuredClone(this.#data.consentEvidence.filter((item) => (!uonLeadId || item.uonLeadId === String(uonLeadId)) && (!evidenceId || item.evidenceId === String(evidenceId))));
+  }
+  async revokeConsentEvidence({ uonLeadId, evidenceId, reason, revokedAt = new Date().toISOString() }) {
+    const item = this.#data.consentEvidence.find((entry) => (evidenceId && entry.evidenceId === String(evidenceId)) || (uonLeadId && entry.uonLeadId === String(uonLeadId)));
+    if (!item) return null;
+    item.revokedAt = revokedAt;
+    item.revocationReason = String(reason || 'Отзыв согласия субъектом персональных данных').slice(0, 500);
+    await this.#persistQueued();
+    return structuredClone(item);
+  }
   #persistQueued() { this.#queue = this.#queue.catch(() => {}).then(() => this.#persist()); return this.#queue; }
   async #persist() { const temp = `${this.#file}.tmp`; await writeFile(temp, JSON.stringify(this.#data, null, 2), { mode: 0o600 }); await rename(temp, this.#file); }
 }

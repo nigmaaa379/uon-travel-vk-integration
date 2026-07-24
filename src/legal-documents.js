@@ -9,11 +9,12 @@ export const LEGAL_DOCUMENTS = {
   offer: 'Условия оказания турагентских услуг',
   payment: 'Условия оплаты',
   booking: 'Правила бронирования',
-  refund: 'Возврат денежных средств'
+  refund: 'Возврат денежных средств',
+  'tour-contract': 'Шаблон договора о реализации туристского продукта'
 };
 
 const ALLOWED_TAGS = new Set(['h2','h3','p','ul','ol','li','strong','b','em','i','a','br']);
-const safeLink = (href) => href.startsWith('/') || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || /^https:\/\/tursbezhimnamore\.ru(?:\/|$)/i.test(href);
+const safeLink = (href) => href.startsWith('/') || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || /^https:\/\/tursbezhimnamore\.ru(?:\/|$)/i.test(href) || /^https:\/\/(?:www\.)?consultant\.ru(?:\/|$)/i.test(href) || /^https:\/\/publication\.pravo\.gov\.ru(?:\/|$)/i.test(href);
 const escapeAttr = (value) => value.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 const escapeText = (value) => String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const stripTags = (value) => value.replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').trim();

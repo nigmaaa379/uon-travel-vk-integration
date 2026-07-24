@@ -33,8 +33,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci --ignore-scripts
+      - run: npm install --ignore-scripts --package-lock=false
       - run: npm run check
       - run: npm test
       - run: docker build --pull --no-cache -t uon-travel-vk-integration:test .

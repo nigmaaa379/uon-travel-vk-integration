@@ -11,6 +11,7 @@ services:
       - /tmp:rw,noexec,nosuid,size=16m,mode=1777
     volumes:
       - app-data:/app/data
+      - site-data:/app/web/data
     cap_drop:
       - ALL
     security_opt:
@@ -28,3 +29,4 @@ services:
         max-file: "3"
 volumes:
   app-data:
+  site-data:

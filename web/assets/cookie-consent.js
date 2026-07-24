@@ -4,9 +4,30 @@ const METRIKA_ID=110979041;
 const banner=document.querySelector('#cookie-banner');
 const accept=document.querySelector('#accept-cookies');
 
+function initializeTourvisorAfterLoad(element){
+  if(element.tagName!=='SCRIPT'||!String(element.dataset.consentSrc||'').includes('tourvisor.ru'))return;
+  element.async=false;
+  element.addEventListener('load',()=>{
+    document.dispatchEvent(new Event('DOMContentLoaded',{bubbles:true}));
+    window.dispatchEvent(new Event('load'));
+    setTimeout(()=>{
+      const form=document.querySelector('.tv-search-form');
+      if(form&&!form.children.length){
+        const retry=document.createElement('script');
+        retry.src='https://tourvisor.ru/module/init.js?retry='+Date.now();
+        retry.async=false;
+        document.head.append(retry);
+      }
+    },1200);
+  },{once:true});
+}
+
 function loadOptionalContent(){
   document.querySelectorAll('[data-consent-src]').forEach(element=>{
-    if(!element.getAttribute('src'))element.setAttribute('src',element.dataset.consentSrc);
+    if(!element.getAttribute('src')){
+      initializeTourvisorAfterLoad(element);
+      element.setAttribute('src',element.dataset.consentSrc);
+    }
   });
   document.querySelector('.tourvisor-consent-note')?.setAttribute('hidden','');
 }

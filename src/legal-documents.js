@@ -39,7 +39,8 @@ export function sanitizeLegalHtml(input) {
 function formatDateRu(value) {
   const date = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(date)+' года';
+  const formatted = new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(date).replace(/\s*г\.$/,'');
+  return formatted + ' года';
 }
 
 function extractDefault(html, slug) {

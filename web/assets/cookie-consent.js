@@ -4,11 +4,18 @@ const METRIKA_ID=110979041;
 const banner=document.querySelector('#cookie-banner');
 const accept=document.querySelector('#accept-cookies');
 
-function stopMetrika(){
+function loadOptionalContent(){
+  document.querySelectorAll('[data-consent-src]').forEach(element=>{
+    if(!element.getAttribute('src'))element.setAttribute('src',element.dataset.consentSrc);
+  });
+}
+
+function stopOptionalContent(){
   if(typeof window.ym==='function'){
     try{window.ym(METRIKA_ID,'destruct')}catch{}
   }
   document.querySelector(`script[data-yandex-metrika="${METRIKA_ID}"]`)?.remove();
+  document.querySelectorAll('[data-consent-src]').forEach(element=>element.removeAttribute('src'));
   try{delete window.ym}catch{window.ym=undefined}
 }
 
@@ -32,19 +39,22 @@ if(!settings){
   document.querySelector('footer')?.append(settings);
 }
 
+if(localStorage.getItem(ACCEPT_KEY))loadOptionalContent();
 if(localStorage.getItem(REJECT_KEY)&&!localStorage.getItem(ACCEPT_KEY)){
+  stopOptionalContent();
   requestAnimationFrame(()=>banner?.classList.remove('visible'));
 }
 
 accept?.addEventListener('click',()=>{
   localStorage.removeItem(REJECT_KEY);
+  loadOptionalContent();
 });
 
 reject?.addEventListener('click',()=>{
   localStorage.removeItem(ACCEPT_KEY);
   localStorage.setItem(REJECT_KEY,new Date().toISOString());
   banner?.classList.remove('visible');
-  stopMetrika();
+  stopOptionalContent();
 });
 
 settings?.addEventListener('click',()=>banner?.classList.add('visible'));

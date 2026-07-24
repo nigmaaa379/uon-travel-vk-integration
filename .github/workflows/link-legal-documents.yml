@@ -1,0 +1,49 @@
+name: Link legal documents
+on:
+  pull_request_target:
+    types: [opened]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  publish:
+    if: github.event.pull_request.title == 'Link legal documents'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          page=Path('web/index.html'); html=page.read_text()
+          old='<span>Согласен(на) на <a href="/page/privacy">обработку персональных данных</a></span>'
+          new='<span>Согласен(на) на <a href="/legal/consent.html">обработку персональных данных</a>; ознакомлен(а) с <a href="/page/privacy">политикой</a></span>'
+          html=html.replace(old,new)
+          old='<span>Согласен(на) получать информационные рассылки</span>'
+          new='<span>Согласен(на) получать <a href="/legal/marketing-consent.html">информационные и рекламные сообщения</a></span>'
+          html=html.replace(old,new)
+          html=html.replace('Нажимая кнопку, вы даете согласие на обработку персональных данных и получение рассылок','Нажимая кнопку, вы даете согласие на обработку персональных данных. Рекламное согласие является добровольным')
+          html=html.replace('<a href="/legal/offer.html">Публичная оферта</a>','<a href="/legal/offer.html">Условия оказания услуг</a>')
+          footer='<a href="/legal/consent.html">Согласие на обработку данных</a><a href="/legal/offer.html">Условия оказания услуг</a>'
+          expanded=footer+'<a href="/legal/marketing-consent.html">Согласие на рекламные сообщения</a><a href="/legal/cookies.html">Политика cookie</a><a href="/legal/payment.html">Условия оплаты</a><a href="/legal/booking.html">Правила бронирования</a><a href="/legal/refund.html">Возврат средств</a>'
+          if footer in html: html=html.replace(footer,expanded)
+          page.write_text(html)
+          sitemap=Path('web/sitemap.xml'); text=sitemap.read_text()
+          entries=['consent','marketing-consent','cookies','offer','payment','booking','refund']
+          for name in entries:
+            url=f'https://tursbezhimnamore.ru/legal/{name}.html'
+            if url not in text: text=text.replace('</urlset>',f'<url><loc>{url}</loc><priority>0.2</priority></url>\n</urlset>')
+          sitemap.write_text(text)
+          Path('test/legal-documents.test.js').write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\nimport {readFile,readdir} from "node:fs/promises";\ntest("publishes complete legal documents and separate consents",async()=>{const html=await readFile(new URL("../web/index.html",import.meta.url),"utf8");assert.match(html,/legal\\/consent\\.html/);assert.match(html,/legal\\/marketing-consent\\.html/);assert.match(html,/legal\\/cookies\\.html/);assert.match(html,/Рекламное согласие является добровольным/);const files=await readdir(new URL("../web/legal/",import.meta.url));for(const name of ["privacy.html","consent.html","marketing-consent.html","cookies.html","offer.html","payment.html","booking.html","refund.html"])assert.ok(files.includes(name),name)});\n''')
+          PY
+          npm test
+          rm -f .github/workflows/link-legal-documents.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat(legal): связать полный комплект документов'
+          git push origin main

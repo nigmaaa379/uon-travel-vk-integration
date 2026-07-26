@@ -1,69 +1,14 @@
-const toNumber = (value) => Number(String(value ?? '').replace(/\D/g, '')) || 0;
-
-export class TourvisorClient {
-  constructor(config) { this.config = config; }
-  async search(params) {
-    const url = new URL(this.config.searchEndpoint);
-    if (this.config.method === 'GET') {
-      for (const [key, value] of Object.entries(params)) {
-        if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
-      }
-    }
-    const response = await fetch(url, {
-      method: this.config.method,
-      headers: { Authorization: this.config.token, 'content-type': 'application/json' },
-      body: this.config.method === 'GET' ? undefined : JSON.stringify(params),
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!response.ok) throw new Error(`Tourvisor HTTP ${response.status}`);
-    const data = await response.json();
-    const rows = data.tours || data.hotTours || data.result?.tours || data.data?.tours || [];
-    const maxBudget = toNumber(params.budget);
-    return rows
-      .map((t) => this.#normalize(t, params))
-      .filter((t) => t.id && t.price && (!maxBudget || t.price <= maxBudget))
-      .sort((a, b) => a.price - b.price)
-      .slice(0, this.config.limit);
-  }
-  #normalize(t, params) {
-    const id = String(t.id ?? t.tourid ?? t.offer_id ?? '');
-    const destination = t.destination ?? t.countryname ?? t.country ?? params.destination;
-    const dates = t.dates ?? t.flydate ?? t.date ?? params.dates;
-    const price = toNumber(t.price ?? t.tourprice ?? t.amount);
-    const hotel = t.hotel ?? t.hotelname ?? t.name ?? 'Тур';
-    const site = new URL(this.config.siteSearchUrl);
-    site.searchParams.set('tourId', id);
-    site.searchParams.set('destination', destination || '');
-    site.searchParams.set('dates', dates || '');
-    site.searchParams.set('group', params.group || '');
-    return { id, destination, dates, price, hotel, group: params.group, siteUrl: site.toString() };
-  }
+const toNumber=value=>Number(String(value??'').replace(/\D/g,''))||0;
+const text=value=>String(value??'').trim();
+const https=value=>{try{const url=new URL(value);return url.protocol==='https:'?url.toString():''}catch{return''}};
+export class TourvisorClient{
+ constructor(config){this.config=config}
+ async search(params){const url=new URL(this.config.searchEndpoint);if(this.config.method==='GET')for(const[key,value]of Object.entries(params))if(value!==undefined&&value!==null)url.searchParams.set(key,String(value));const response=await fetch(url,{method:this.config.method,headers:{Authorization:this.config.token,'content-type':'application/json'},body:this.config.method==='GET'?undefined:JSON.stringify(params),signal:AbortSignal.timeout(30000)});if(!response.ok)throw new Error(`Tourvisor HTTP ${response.status}`);const data=await response.json(),rows=data.tours||data.hotTours||data.result?.tours||data.data?.tours||[],maxBudget=toNumber(params.budget);return rows.map(row=>this.#normalize(row,params)).filter(tour=>tour.id&&tour.price&&(!maxBudget||tour.price<=maxBudget)).sort((a,b)=>a.price-b.price).slice(0,this.config.limit)}
+ #normalize(row,params){const id=text(row.id??row.tourid??row.offer_id),destination=text(row.destination??row.countryname??row.country??params.destination),dates=text(row.dates??row.flydate??row.date??params.dates),price=toNumber(row.price??row.tourprice??row.amount),hotel=text(row.hotel??row.hotelname??row.name)||'Тур',operator=text(row.operator??row.operatorname??row.touroperator),directUrl=https(row.url??row.link??row.booking_url??row.tour_url);const site=new URL(this.config.siteSearchUrl);for(const[key,value]of Object.entries({tourId:id,destination,dates,group:params.group||'',hotel,price:String(price),operator}))site.searchParams.set(key,value);return{id,destination,dates,price,hotel,operator,group:params.group,siteUrl:directUrl||site.toString(),agencyUrl:site.toString()}}
 }
-
-export class HotToursScheduler {
-  constructor({ store, tourvisor, clients, hours, logger = console }) { Object.assign(this, { store, tourvisor, clients, hours, logger }); this.lastRun = null; }
-  start() { this.timer = setInterval(() => this.tick().catch((e) => this.logger.error('Hot tours job failed', { error: e.message })), 60_000); this.tick().catch(() => {}); }
-  stop() { clearInterval(this.timer); }
-  async tick(now = new Date()) {
-    const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Moscow', hour: '2-digit', hour12: false }).format(now));
-    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-    const runKey = `${day}:${hour}`;
-    if (!this.hours.includes(hour) || this.lastRun === runKey) return;
-    this.lastRun = runKey;
-    await this.run();
-  }
-  async run() {
-    for (const sub of this.store.listSubscriptions()) {
-      try {
-        const offers = await this.tourvisor.search(sub.params);
-        const unseen = offers.filter((o) => !sub.sentOfferIds.includes(o.id));
-        for (const offer of unseen) {
-          await this.store.saveOffer(offer);
-          const output = { text: `🔥 ${offer.hotel}\n${offer.destination}, ${offer.dates}\nЦена от ${offer.price.toLocaleString('ru-RU')} ₽`, buttons: [[{ text: 'Открыть на сайте', url: offer.siteUrl }], [{ text: 'Хочу забронировать', callback: `booking:${offer.id}` }]] };
-          await this.clients[sub.platform].send(sub.userId, output);
-        }
-        await this.store.markSubscriptionSent(sub.id, unseen.map((o) => o.id));
-      } catch (error) { this.logger.error('Subscription failed', { subscriptionId: sub.id, error: error.message }); }
-    }
-  }
+export class HotToursScheduler{
+ constructor({store,tourvisor,clients,hours,logger=console}){Object.assign(this,{store,tourvisor,clients,hours,logger});this.lastRun=null}
+ start(){this.timer=setInterval(()=>this.tick().catch(error=>this.logger.error('Hot tours job failed',{error:error.message})),60000);this.tick().catch(()=>{})}stop(){clearInterval(this.timer)}
+ async tick(now=new Date()){const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Moscow',hour:'2-digit',hour12:false}).format(now)),day=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(now),runKey=`${day}:${hour}`;if(!this.hours.includes(hour)||this.lastRun===runKey)return;this.lastRun=runKey;await this.run()}
+ async run(){for(const sub of this.store.listSubscriptions()){try{const offers=await this.tourvisor.search(sub.params),unseen=offers.filter(offer=>!(sub.sentOfferIds||[]).includes(offer.id));for(const offer of unseen){await this.store.saveOffer(offer);const output={text:`🔥 Подходящее предложение\n\n🏨 ${offer.hotel}\n🌍 ${offer.destination}\n📅 ${offer.dates}\n👨‍👩‍👧‍👦 ${offer.group||'Состав уточняется'}\n💳 от ${offer.price.toLocaleString('ru-RU')} ₽${offer.operator?`\n✈️ ${offer.operator}`:''}\n\nЦена и наличие меняются. Бронирование и передача контактных данных выполняются только на сайте турагентства.`,buttons:[[{text:'Открыть и забронировать на сайте',url:offer.agencyUrl||offer.siteUrl}],[{text:'Остановить рассылку',callback:'stop'}]]};await this.clients[sub.platform].send(sub.userId,output)}await this.store.markSubscriptionSent(sub.id,unseen.map(offer=>offer.id))}catch(error){this.logger.error('Subscription failed',{subscriptionId:sub.id,error:error.message})}}}
 }

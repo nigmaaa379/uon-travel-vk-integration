@@ -1,8 +1,10 @@
+import { dirname, join } from 'node:path';
 import { loadConfig } from './config.js';
 import { JsonStore } from './store.js';
 import { UonClient, VkClient, Notifier } from './clients.js';
 import { TelegramClient, MaxClient } from './platforms.js';
 import { BotCore } from './bot-core-v2.js';
+import { BotAdminService } from './bot-admin.js';
 import { TourvisorClient, HotToursScheduler } from './hot-tours.js';
 import { buildServer } from './app.js';
 import { secureServer } from './security.js';
@@ -11,5 +13,8 @@ const uon=new UonClient(config.uon),notifier=new Notifier(config.smtp,config.not
 if(config.telegram)platforms.telegram=new TelegramClient(config.telegram);if(config.max)platforms.max=new MaxClient(config.max);
 for(const[platform,client]of Object.entries(platforms)){try{await client.configure?.()}catch(error){console.error('Bot menu configuration failed',{platform,error:error.message})}}
 const botCore=new BotCore({store,uon,notifier}),scheduler=config.tourvisor&&Object.keys(platforms).length?new HotToursScheduler({store,tourvisor:new TourvisorClient(config.tourvisor),clients:platforms,hours:config.hotToursHours}):null;
-const server=secureServer(buildServer({config,store,vk:new VkClient(config.vk),uon,notifier,botCore,platforms}),config.security);server.listen(config.port,'0.0.0.0',()=>console.log(`Listening on :${config.port}; PD strict mode: ${config.strictMode}`));scheduler?.start();
+const rawServer=buildServer({config,store,vk:new VkClient(config.vk),uon,notifier,botCore,platforms});
+const botAdmin=new BotAdminService({file:join(dirname(config.dataFile),'bot-admin.json'),store,platforms,masterCredential:config.adminPassword});await botAdmin.init();
+const fallback=rawServer.listeners('request')[0];rawServer.removeAllListeners('request');rawServer.on('request',async(req,res)=>{if(await botAdmin.handle(req,res))return;fallback(req,res)});
+const server=secureServer(rawServer,config.security);server.listen(config.port,'0.0.0.0',()=>console.log(`Listening on :${config.port}; PD strict mode: ${config.strictMode}`));scheduler?.start();
 const shutdown=()=>{scheduler?.stop();server.close(()=>process.exit(0));setTimeout(()=>process.exit(1),15000).unref()};process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);process.on('uncaughtException',e=>{console.error('Uncaught exception',{error:e.message});shutdown()});process.on('unhandledRejection',e=>{console.error('Unhandled rejection',{error:e instanceof Error?e.message:String(e)});shutdown()});

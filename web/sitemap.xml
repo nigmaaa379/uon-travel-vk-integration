@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-<url><loc>https://tursbezhimnamore.ru/</loc><priority>1.0</priority></url>
-<url><loc>https://tursbezhimnamore.ru/countries/turkey.html</loc><priority>0.8</priority></url>
-<url><loc>https://tursbezhimnamore.ru/countries/egypt.html</loc><priority>0.8</priority></url>
-<url><loc>https://tursbezhimnamore.ru/countries/uae.html</loc><priority>0.8</priority></url>
-<url><loc>https://tursbezhimnamore.ru/countries/maldives.html</loc><priority>0.8</priority></url>
-<url><loc>https://tursbezhimnamore.ru/countries/thailand.html</loc><priority>0.8</priority></url>
-<url><loc>https://tursbezhimnamore.ru/countries/vietnam.html</loc><priority>0.8</priority></url>
-<url><loc>https://tursbezhimnamore.ru/page/privacy</loc><priority>0.2</priority></url>
-<url><loc>https://tursbezhimnamore.ru/legal/service-terms.html</loc><priority>0.2</priority></url>
-<url><loc>https://tursbezhimnamore.ru/legal/tour-contract.html</loc><priority>0.2</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/countries/turkey.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/countries/egypt.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/countries/uae.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/countries/maldives.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/countries/thailand.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/countries/vietnam.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/countries/seychelles.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/tours</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/page/privacy</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/legal/service-terms.html</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+	<url><loc>https://tursbezhimnamore.ru/legal/tour-contract.html</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
 </urlset>

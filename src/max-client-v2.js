@@ -2,6 +2,7 @@ import { MaxClient } from './platforms.js';
 
 const DEFAULT_WEBHOOK_URL = 'https://tursbezhimnamore.ru/max/webhook';
 const START_EVENTS = new Set(['bot_started', 'bot_added']);
+const DEFAULT_ACK_NOTIFICATION = 'Принято, обрабатываю…';
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function unwrap(update) {
@@ -34,6 +35,16 @@ function messageBody(output) {
     ? { type: 'link', text: button.text, url: button.url }
     : { type: 'callback', text: button.text, payload: button.callback }));
   return { text: output.text, attachments: buttons.length ? [{ type: 'inline_keyboard', payload: { buttons } }] : undefined };
+}
+
+// MAX требует в теле ответа на callback ровно одно из полей: message или notification.
+// Пустой объект приводит к ошибке 400 proto.payload.
+function ackBody(options = {}) {
+  if (options.output) return { message: messageBody(options.output) };
+  const notification = typeof options.notification === 'string' && options.notification.trim()
+    ? options.notification.trim()
+    : DEFAULT_ACK_NOTIFICATION;
+  return { notification };
 }
 
 export class MaxClientV2 extends MaxClient {
@@ -79,12 +90,12 @@ export class MaxClientV2 extends MaxClient {
     return super.parse(event);
   }
 
-  ack(callbackId) {
+  ack(callbackId, options = {}) {
     if (!callbackId) return;
     void requestJson(`${this.config.apiUrl}/answers?callback_id=${encodeURIComponent(callbackId)}`, {
       method: 'POST',
       headers: { Authorization: this.config.token, 'content-type': 'application/json' },
-      body: '{}',
+      body: JSON.stringify(ackBody(options)),
     }, 1).catch((error) => console.warn('MAX callback acknowledgement failed', { error: error.message }));
   }
 

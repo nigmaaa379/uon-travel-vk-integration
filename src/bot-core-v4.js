@@ -9,6 +9,7 @@ const MENU = [[b('🏠 В меню', 'menu')]];
 const DEPARTURE_STATES = ['_departureLead', '_departureSub'];
 const CONTACTS_STATE = '_contacts';
 const BUDGET_PLACEHOLDER = 'Уточняется менеджером в диалоге';
+const DEFAULT_MANAGER_TELEGRAM = 'https://t.me/Lg_goreva';
 
 // Уточняющие ответы: вариант «Другое …» не должен идти дальше по сценарию,
 // сначала просим написать значение сообщением.
@@ -74,10 +75,17 @@ const contactsPrompt = () => ({
 	buttons: MENU
 });
 
-const managerPrompt = () => {
+// Кнопка менеджера ведёт в тот же мессенджер, в котором человек сейчас общается:
+// в Telegram — на Telegram-аккаунт менеджера, в MAX — на профиль в MAX.
+const managerPrompt = (platform) => {
 	const maxUrl = process.env.MANAGER_MAX_URL?.trim();
+	const telegramUrl = process.env.MANAGER_TELEGRAM_URL?.trim() || DEFAULT_MANAGER_TELEGRAM;
 	const buttons = [];
-	if (maxUrl) buttons.push([u('Написать в MAX', maxUrl)]);
+	if (platform === 'telegram') {
+		if (telegramUrl) buttons.push([u('Написать в Telegram', telegramUrl)]);
+	} else if (maxUrl) {
+		buttons.push([u('Написать в MAX', maxUrl)]);
+	}
 	buttons.push([u('Открыть сайт', SITE)]);
 	buttons.push([b('🏠 В меню', 'menu')]);
 	return {
@@ -351,7 +359,7 @@ export class BotCore extends BaseBotCore {
 			return { ...output, ...datesPrompt('На какой период искать горящие туры? Выберите вариант или напишите месяц сообщением.') };
 		}
 		if (output?.text?.startsWith('Кто отправится')) return { ...output, ...groupPrompt() };
-		if (output?.text?.startsWith('💬 Менеджер')) return { ...output, ...managerPrompt() };
+		if (output?.text?.startsWith('💬 Менеджер')) return { ...output, ...managerPrompt(platform) };
 		return output;
 	}
 }

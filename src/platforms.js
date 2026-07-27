@@ -1,34 +1,93 @@
-async function fetchJson(url, options) {
-  const response = await fetch(url, { ...options, signal: AbortSignal.timeout(10000) });
+// Telegram API недоступен напрямую с российских серверов, поэтому адрес API берётся из
+// TELEGRAM_API_BASE (реверс-прокси на зарубежном сервере), а исходящие запросы при необходимости
+// идут через HTTP-прокси из TELEGRAM_PROXY_URL.
+const DEFAULT_TELEGRAM_API = 'https://api.telegram.org';
+const NETWORK_HINT = '\u0421еть недоступна. С российских серверов api.telegram.org заблокирован: укажите TELEGRAM_API_BASE (реверс-прокси) или TELEGRAM_PROXY_URL.';
+
+let proxyDispatcherPromise = null;
+let proxyWarningShown = false;
+
+// undici входит в Node, но как отдельный пакет может быть не установлен.
+// Если его нет, работаем напрямую и пишем предупреждение вместо падения сервиса.
+async function proxyDispatcher(proxyUrl, logger = console) {
+  if (!proxyUrl) return undefined;
+  if (!proxyDispatcherPromise) {
+    proxyDispatcherPromise = import('undici')
+      .then(({ ProxyAgent }) => new ProxyAgent(proxyUrl))
+      .catch((error) => {
+        if (!proxyWarningShown) {
+          proxyWarningShown = true;
+          logger.warn?.('Telegram proxy is not available', { error: error.message, hint: 'npm i undici или используйте TELEGRAM_API_BASE' });
+        }
+        return undefined;
+      });
+  }
+  return proxyDispatcherPromise;
+}
+
+async function fetchJson(url, options = {}) {
+  let response;
+  try {
+    response = await fetch(url, { ...options, signal: AbortSignal.timeout(options.timeoutMs || 10000) });
+  } catch (error) {
+    throw new Error(`Platform API request failed: ${error.message}`);
+  }
   const data = await response.json();
   if (!response.ok || data.ok === false) throw new Error(`Platform API ${response.status}: ${JSON.stringify(data)}`);
   return data;
 }
 
 export class TelegramClient {
-  constructor(config) { this.config = config; }
+  constructor(config, logger = console) {
+    this.config = config;
+    this.logger = logger;
+    this.apiBase = (config.apiBase || DEFAULT_TELEGRAM_API).replace(/\/$/, '');
+  }
+
+  get base() {
+    return `${this.apiBase}/bot${this.config.token}`;
+  }
+
+  async call(method, payload) {
+    const dispatcher = await proxyDispatcher(this.config.proxyUrl, this.logger);
+    try {
+      return await fetchJson(`${this.base}/${method}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+        ...(dispatcher ? { dispatcher } : {}),
+      });
+    } catch (error) {
+      if (error.message.includes('request failed')) throw new Error(`${error.message}. ${NETWORK_HINT}`);
+      throw error;
+    }
+  }
+
   async configure() {
-    const base = `https://api.telegram.org/bot${this.config.token}`;
-    await fetchJson(`${base}/setMyCommands`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ commands: [
+    await this.call('setMyCommands', {
+      commands: [
         { command: 'start', description: 'Главное меню' },
         { command: 'help', description: 'Помощь и документы' },
-      ] }),
+      ],
     });
-    await fetchJson(`${base}/setChatMenuButton`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ menu_button: { type: 'commands' } }),
-    });
+    await this.call('setChatMenuButton', { menu_button: { type: 'commands' } });
   }
+
   async send(userId, output) {
     const inline_keyboard = (output.buttons || []).map((row) => row.map((button) => button.url ? { text: button.text, url: button.url } : { text: button.text, callback_data: button.callback }));
-    return fetchJson(`https://api.telegram.org/bot${this.config.token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: userId, text: output.text, disable_web_page_preview: true, reply_markup: inline_keyboard.length ? { inline_keyboard } : undefined }) });
+    return this.call('sendMessage', {
+      chat_id: userId,
+      text: output.text,
+      disable_web_page_preview: true,
+      reply_markup: inline_keyboard.length ? { inline_keyboard } : undefined,
+    });
   }
+
   async ack(callbackId) {
     if (!callbackId) return;
-    await fetchJson(`https://api.telegram.org/bot${this.config.token}/answerCallbackQuery`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ callback_query_id: callbackId }) });
+    await this.call('answerCallbackQuery', { callback_query_id: callbackId });
   }
+
   parse(update) {
     if (update.callback_query) return { eventId: `tg:cb:${update.callback_query.id}`, ackId: update.callback_query.id, userId: String(update.callback_query.from.id), input: { callback: update.callback_query.data } };
     const message = update.message;

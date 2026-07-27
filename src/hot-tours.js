@@ -1,5 +1,7 @@
-// Горящие туры берём из XML API Турвизора (hottours.php): авторизация через authlogin/authpass,
-// ответ в JSON, город вылета и страна передаются числовыми кодами из справочников list.php.
+// Горящие туры работают в двух режимах:
+// 1) есть платный XML API Турвизора (hottours.php) — в сообщение идут конкретные отели и цены;
+// 2) API не подключён или доступы неверны — бот присылает ссылку на модуль поиска на сайте
+//    с подставленными параметрами подписки (транзит на сайт по ТЗ выполняется, цены клиент видит живые).
 const toNumber = (value) => Number(String(value ?? '').replace(/[^\d]/g, '')) || 0;
 const text = (value) => String(value ?? '').trim();
 const https = (value) => {
@@ -20,6 +22,7 @@ const describe = (value) => {
 const REFERENCE_TTL_MS = 86_400_000;
 const AUTH_HINT = 'проверьте TOURVISOR_LOGIN и TOURVISOR_PASSWORD';
 const TOUR_KEYS = ['price', 'tourprice', 'amount', 'hotelname', 'hotel', 'countryname'];
+const SKIP_VALUES = ['другой город', 'другое направление', 'другие даты', 'другой состав', 'не указано', 'не указан'];
 
 const CITY_ALIASES = {
 	'нужен только отель без перелета': [],
@@ -114,12 +117,7 @@ export class TourvisorClient {
 	async reference(type) {
 		const cached = this.references[type];
 		if (cached && Date.now() - cached.at < REFERENCE_TTL_MS) return cached.items;
-		let items = [];
-		try {
-			items = findRefs(await this.request(this.listEndpoint, { type }), type);
-		} catch (error) {
-			this.logger.warn?.('Tourvisor reference loading failed', { type, error: error.message });
-		}
+		const items = findRefs(await this.request(this.listEndpoint, { type }), type);
 		this.references[type] = { at: Date.now(), items };
 		return items;
 	}
@@ -200,10 +198,57 @@ export class TourvisorClient {
 	}
 }
 
+const meaningful = (value) => {
+	const normalized = norm(value);
+	return normalized && !SKIP_VALUES.includes(normalized) ? text(value) : '';
+};
+
+// Ссылка на модуль поиска Турвизора на сайте с параметрами подписки.
+export function buildSearchLink(pageUrl, params = {}) {
+	const url = new URL(pageUrl);
+	const hash = url.hash;
+	url.hash = '';
+	const mapping = {
+		departure: params.departureCity || params.city,
+		country: params.destination,
+		when: params.dates,
+		group: params.group
+	};
+	for (const [key, value] of Object.entries(mapping)) {
+		const clean = meaningful(value);
+		if (clean) url.searchParams.set(key, clean);
+	}
+	url.searchParams.set('utm_source', 'bot');
+	url.searchParams.set('utm_campaign', 'hot-tours');
+	url.hash = hash;
+	return url.toString();
+}
+
+export function buildDigestOutput(pageUrl, params = {}) {
+	const city = meaningful(params.departureCity || params.city);
+	const destination = meaningful(params.destination);
+	const dates = meaningful(params.dates);
+	const rows = [
+		city ? `✈️ Вылет: ${city}` : '',
+		destination ? `🌍 Направление: ${destination}` : '',
+		dates ? `📅 Даты: ${dates}` : ''
+	].filter(Boolean);
+	const title = destination ? `🔥 Свежие горящие предложения: ${destination}` : '🔥 Свежие горящие предложения';
+	return {
+		text: `${title}\n\n${rows.join('\n')}${rows.length ? '\n\n' : ''}Мы обновили подборку туров под ваш запрос. Нажмите кнопку ниже — откроется поиск на сайте с актуальными ценами туроператоров.\n\nЦены и места меняются в течение дня. Бронирование и передача контактных данных выполняются только на сайте турагентства.`,
+		buttons: [
+			[{ text: 'Посмотреть актуальные туры', url: buildSearchLink(pageUrl, params) }],
+			[{ text: 'Связаться с менеджером', callback: 'manager' }],
+			[{ text: 'Остановить рассылку', callback: 'stop' }]
+		]
+	};
+}
+
 export class HotToursScheduler {
-	constructor({ store, tourvisor, clients, hours, logger = console }) {
-		Object.assign(this, { store, tourvisor, clients, hours, logger });
+	constructor({ store, tourvisor, clients, hours, searchPageUrl, logger = console }) {
+		Object.assign(this, { store, tourvisor, clients, hours, searchPageUrl, logger });
 		this.lastRun = null;
+		this.apiDisabled = !tourvisor;
 	}
 
 	start() {
@@ -224,31 +269,51 @@ export class HotToursScheduler {
 		await this.run();
 	}
 
+	offerOutput(offer) {
+		return {
+			text: `🔥 Подходящее предложение\n\n🏨 ${offer.hotel}\n🌍 ${offer.destination}\n📅 ${offer.dates}\n👨‍👩‍👧‍👦 ${offer.group || 'Состав уточняется'}\n💳 от ${offer.price.toLocaleString('ru-RU')} ₽${offer.meal ? `\n🍴 ${offer.meal}` : ''}${offer.operator ? `\n✈️ ${offer.operator}` : ''}\n\nЦена и наличие меняются. Бронирование и передача контактных данных выполняются только на сайте турагентства.`,
+			buttons: [
+				[{ text: 'Открыть и забронировать на сайте', url: offer.agencyUrl || offer.siteUrl }],
+				[{ text: 'Остановить рассылку', callback: 'stop' }]
+			]
+		};
+	}
+
+	async sendDigest(sub) {
+		if (!this.searchPageUrl) return;
+		await this.clients[sub.platform].send(sub.userId, buildDigestOutput(this.searchPageUrl, sub.params || {}));
+	}
+
 	async run() {
-		const subscriptions = this.store.listSubscriptions();
-		for (const sub of subscriptions) {
+		for (const sub of this.store.listSubscriptions()) {
 			try {
-				const offers = await this.tourvisor.search(sub.params);
+				if (this.apiDisabled) {
+					await this.sendDigest(sub);
+					continue;
+				}
+				let offers;
+				try {
+					offers = await this.tourvisor.search(sub.params);
+				} catch (error) {
+					// Нет платного доступа к API — переходим на ссылку на модуль поиска на сайте.
+					if (!/authorization failed|non-JSON/i.test(error.message)) throw error;
+					this.apiDisabled = true;
+					this.logger.warn?.('Tourvisor API unavailable, sending search links instead', { error: error.message });
+					await this.sendDigest(sub);
+					continue;
+				}
 				const unseen = offers.filter((offer) => !(sub.sentOfferIds || []).includes(offer.id));
+				if (!unseen.length) {
+					await this.sendDigest(sub);
+					continue;
+				}
 				for (const offer of unseen) {
 					await this.store.saveOffer(offer);
-					const output = {
-						text: `🔥 Подходящее предложение\n\n🏨 ${offer.hotel}\n🌍 ${offer.destination}\n📅 ${offer.dates}\n👨‍👩‍👧‍👦 ${offer.group || 'Состав уточняется'}\n💳 от ${offer.price.toLocaleString('ru-RU')} ₽${offer.meal ? `\n🍴 ${offer.meal}` : ''}${offer.operator ? `\n✈️ ${offer.operator}` : ''}\n\nЦена и наличие меняются. Бронирование и передача контактных данных выполняются только на сайте турагентства.`,
-						buttons: [
-							[{ text: 'Открыть и забронировать на сайте', url: offer.agencyUrl || offer.siteUrl }],
-							[{ text: 'Остановить рассылку', callback: 'stop' }]
-						]
-					};
-					await this.clients[sub.platform].send(sub.userId, output);
+					await this.clients[sub.platform].send(sub.userId, this.offerOutput(offer));
 				}
 				await this.store.markSubscriptionSent(sub.id, unseen.map((offer) => offer.id));
 			} catch (error) {
 				this.logger.error('Subscription failed', { subscriptionId: sub.id, platform: sub.platform, error: error.message });
-				// Если доступы Турвизора неверны, остальные подписки обрабатывать бессмысленно.
-				if (/authorization failed/i.test(error.message)) {
-					this.logger.error('Hot tours run stopped: Tourvisor credentials are invalid', { pending: subscriptions.length });
-					return;
-				}
 			}
 		}
 	}

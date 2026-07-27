@@ -1,0 +1,39 @@
+/* Country landing pages — built on the main site design tokens */
+.country-hero{min-height:clamp(430px,64vh,660px);background-position:center 55%;background-size:cover;background-repeat:no-repeat}
+.hero-turkey{background-image:linear-gradient(90deg,rgba(2,41,51,.94),rgba(2,52,64,.55),rgba(2,52,64,.14)),url('https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?auto=format&fit=crop&w=2000&q=85')}
+.hero-egypt{background-image:linear-gradient(90deg,rgba(2,41,51,.94),rgba(2,52,64,.55),rgba(2,52,64,.14)),url('https://images.unsplash.com/photo-1539650116574-8efeb43e2750?auto=format&fit=crop&w=2000&q=85')}
+.hero-uae{background-image:linear-gradient(90deg,rgba(2,41,51,.94),rgba(2,52,64,.55),rgba(2,52,64,.14)),url('https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=2000&q=85')}
+.hero-maldives{background-image:linear-gradient(90deg,rgba(2,41,51,.94),rgba(2,52,64,.55),rgba(2,52,64,.14)),url('https://images.unsplash.com/photo-1514282401047-d79a71a590e8?auto=format&fit=crop&w=2000&q=85')}
+.hero-thailand{background-image:linear-gradient(90deg,rgba(2,41,51,.94),rgba(2,52,64,.55),rgba(2,52,64,.14)),url('https://images.unsplash.com/photo-1506665531195-3566af2b4dfa?auto=format&fit=crop&w=2000&q=85')}
+.hero-vietnam{background-image:linear-gradient(90deg,rgba(2,41,51,.94),rgba(2,52,64,.55),rgba(2,52,64,.14)),url('https://images.unsplash.com/photo-1528127269322-539801943592?auto=format&fit=crop&w=2000&q=85')}
+.hero-seychelles{background-image:linear-gradient(90deg,rgba(2,41,51,.94),rgba(2,52,64,.55),rgba(2,52,64,.14)),url('https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=2000&q=85')}
+.crumbs{padding-block:16px;font-size:.76rem;color:var(--muted)}
+.crumbs a{color:var(--ocean);font-weight:700;text-decoration:none}
+.facts{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(215px,1fr))}
+.fact{background:white;border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;box-shadow:0 4px 14px rgba(4,55,67,.06)}
+.fact span{font-size:.7rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--orange)}
+.fact b{display:block;margin:9px 0 6px;font:500 1.7rem/1.1 'Cormorant Garamond',Georgia,serif;color:var(--deep)}
+.fact p{margin:0;font-size:.86rem;color:var(--muted)}
+.resorts{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(255px,1fr))}
+.resort{background:white;border-radius:var(--radius);border-top:3px solid var(--aqua);padding:24px;box-shadow:var(--shadow)}
+.resort h3{margin:0 0 8px;font:500 1.95rem/1 'Cormorant Garamond',Georgia,serif;color:var(--deep)}
+.resort p{margin:0 0 10px;font-size:.93rem}
+.resort ul{margin:0;padding-left:18px;font-size:.85rem;color:var(--muted)}
+.resort li{margin-bottom:4px}
+.season{display:grid;gap:12px}
+.season-row{display:grid;grid-template-columns:170px 1fr;gap:16px;background:white;border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.season-row b{color:var(--orange2);font-size:.95rem}
+.season-row p{margin:0;font-size:.9rem}
+.tips{list-style:none;padding:0;margin:0;display:grid;gap:11px}
+.tips li{display:grid;grid-template-columns:22px 1fr;gap:10px;font-size:.95rem}
+.tips li:before{content:'✓';color:var(--ocean);font-weight:800}
+.faq{display:grid;gap:12px}
+.faq details{background:white;border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.faq details[open]{border-color:var(--aqua)}
+.faq summary{cursor:pointer;font-weight:700;color:var(--deep)}
+.faq p{margin:11px 0 0;font-size:.92rem;color:#294a53}
+.other-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(185px,1fr))}
+.other-grid a{display:flex;justify-content:space-between;gap:10px;background:white;border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-weight:700;color:var(--deep);text-decoration:none;transition:.2s}
+.other-grid a:hover{border-color:var(--ocean);color:var(--ocean);transform:translateY(-1px)}
+.country-note{background:#fff1df;border-left:3px solid var(--orange);border-radius:8px;padding:16px 18px;margin-top:22px;font-size:.88rem}
+@media(max-width:560px){.season-row{grid-template-columns:1fr;gap:6px}}

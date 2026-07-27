@@ -87,6 +87,25 @@ export class MaxClientV2 extends MaxClient {
         input: { callback: payload },
       } : null;
     }
+    if (event?.update_type === 'message_created') {
+      const parsed = super.parse(event);
+      if (parsed) return parsed;
+      // Резервный разбор: текстовые ответы не должны теряться из-за другого расположения идентификатора.
+      const message = event.message || {};
+      const id = message.sender?.user_id ?? message.from?.user_id ?? message.recipient?.user_id ?? event.user?.user_id ?? event.user_id;
+      const chatId = message.recipient?.chat_id ?? message.chat_id ?? event.chat_id;
+      const target = id ?? (chatId ? `chat:${chatId}` : null);
+      const text = message.body?.text ?? message.text ?? '';
+      if (target) {
+        return {
+          eventId: `max:msg:${message.body?.mid || message.mid || event.timestamp || Date.now()}:${target}`,
+          userId: String(target),
+          input: { text },
+        };
+      }
+      console.warn('MAX message could not be parsed', { eventKeys: Object.keys(event), messageKeys: Object.keys(message) });
+      return null;
+    }
     return super.parse(event);
   }
 

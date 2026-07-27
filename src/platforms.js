@@ -2,7 +2,19 @@
 // TELEGRAM_API_BASE (реверс-прокси на зарубежном сервере), а исходящие запросы при необходимости
 // идут через HTTP-прокси из TELEGRAM_PROXY_URL.
 const DEFAULT_TELEGRAM_API = 'https://api.telegram.org';
-const NETWORK_HINT = '\u0421еть недоступна. С российских серверов api.telegram.org заблокирован: укажите TELEGRAM_API_BASE (реверс-прокси) или TELEGRAM_PROXY_URL.';
+const NETWORK_HINT = 'Сеть недоступна. С российских серверов api.telegram.org заблокирован: укажите TELEGRAM_API_BASE (реверс-прокси) или TELEGRAM_PROXY_URL.';
+
+// Меню команд совпадает с набором команд бота в MAX и ВК.
+const TELEGRAM_COMMANDS = [
+  { command: 'start', description: 'Главное меню' },
+  { command: 'search', description: 'Подобрать тур' },
+  { command: 'hot', description: 'Горящие предложения' },
+  { command: 'manager', description: 'Связаться с менеджером' },
+  { command: 'stop', description: 'Остановить рассылку' },
+  { command: 'privacy', description: 'Политика конфиденциальности' },
+  { command: 'documents', description: 'Документы и реквизиты' },
+  { command: 'help', description: 'Помощь' },
+];
 
 let proxyDispatcherPromise = null;
 let proxyWarningShown = false;
@@ -64,12 +76,7 @@ export class TelegramClient {
   }
 
   async configure() {
-    await this.call('setMyCommands', {
-      commands: [
-        { command: 'start', description: 'Главное меню' },
-        { command: 'help', description: 'Помощь и документы' },
-      ],
-    });
+    await this.call('setMyCommands', { commands: TELEGRAM_COMMANDS });
     await this.call('setChatMenuButton', { menu_button: { type: 'commands' } });
   }
 

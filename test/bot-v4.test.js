@@ -8,14 +8,26 @@ const makeCore = (uonOverrides = {}) => {
 	const sessions = {};
 	const leads = [];
 	const fallbackLeads = [];
+	const subscriptions = [];
 	const store = {
 		touchBotUser: async () => {},
 		getBotSession: (k) => sessions[k] || null,
 		saveBotSession: async (k, v) => { sessions[k] = v; },
 		clearBotSession: async (k) => { delete sessions[k]; },
 		saveConsentEvidence: async () => {},
-		addSubscription: async () => {},
-		deactivateSubscriptions: async () => 0
+		addSubscription: async ({ platform, userId, params, consent }) => {
+			const item = { id: String(subscriptions.length + 1), platform, userId: String(userId), params, consent, active: true };
+			subscriptions.push(item);
+			return item;
+		},
+		listSubscriptions: () => subscriptions.filter((item) => item.active),
+		deactivateSubscriptions: async (platform, userId) => {
+			let count = 0;
+			for (const item of subscriptions) {
+				if (item.platform === platform && String(item.userId) === String(userId) && item.active) { item.active = false; count += 1; }
+			}
+			return count;
+		}
 	};
 	const uon = {
 		createQualifiedLead: async (t) => { leads.push(t); return { id: 777 }; },
@@ -23,7 +35,7 @@ const makeCore = (uonOverrides = {}) => {
 		...uonOverrides
 	};
 	const core = new BotCore({ store, uon, notifier: { notify: async () => ({ ok: true }) }, logger: silentLogger });
-	return { core, store, leads, fallbackLeads };
+	return { core, store, leads, fallbackLeads, subscriptions };
 };
 
 const startQualification = async (core) => {
@@ -38,6 +50,16 @@ const walkToContacts = async (core) => {
 	await core.handle('max', '1', { callback: 'a:Турция' });
 	await core.handle('max', '1', { callback: 'a:Осень-зима 2026/2027' });
 	return core.handle('max', '1', { callback: 'a:2 взрослых + 1 ребёнок' });
+};
+
+const walkSubscription = async (core, options = {}) => {
+	const { city = 'Москва', destination = 'Турция', dates = 'Ближайшие 2–4 недели', group = '2 взрослых' } = options;
+	await core.handle('max', '1', { callback: 'subscribe' });
+	await core.handle('max', '1', { callback: 'consent:ads' });
+	await core.handle('max', '1', { callback: `v4:city:${city}` });
+	await core.handle('max', '1', { callback: `a:${destination}` });
+	await core.handle('max', '1', { callback: `a:${dates}` });
+	return core.handle('max', '1', { callback: `a:${group}` });
 };
 
 test('короткий сценарий: город, направление, даты, состав, имя и телефон', async () => {
@@ -136,4 +158,49 @@ test('текст города вылета не сбрасывает диало�
 	const destination = await core.handle('max', '1', { text: 'Ярославль' });
 	assert.match(destination.text, /направление/);
 	assert.equal(store.getBotSession('max:1').answers.departureCity, 'Ярославль');
+});
+
+test('подписка на горящие сохраняется и показывается при повторном нажатии', async () => {
+	const { core, subscriptions } = makeCore();
+	const saved = await walkSubscription(core);
+	assert.match(saved.text, /Рассылка горящих предложений настроена/);
+	assert.match(saved.text, /Турция/);
+	assert.match(saved.text, /Москва/);
+	assert.equal(subscriptions.length, 1);
+
+	const again = await core.handle('max', '1', { callback: 'subscribe' });
+	assert.match(again.text, /уже подключена/);
+	assert.match(again.text, /Турция/);
+	assert.ok(again.buttons.flat().some((x) => x.callback === 'v4:sub:edit'));
+	assert.ok(again.buttons.flat().some((x) => x.callback === 'stop'));
+	assert.equal(subscriptions.filter((item) => item.active).length, 1);
+});
+
+test('изменение параметров не спрашивает согласие заново и отключает старую подписку', async () => {
+	const { core, subscriptions } = makeCore();
+	await walkSubscription(core);
+	const edit = await core.handle('max', '1', { callback: 'v4:sub:edit' });
+	assert.match(edit.text, /Обновим параметры/);
+	assert.ok(edit.buttons.flat().some((x) => x.callback === 'v4:city:Казань'));
+
+	await core.handle('max', '1', { callback: 'v4:city:Казань' });
+	await core.handle('max', '1', { callback: 'a:Египет' });
+	await core.handle('max', '1', { callback: 'a:Осень-зима 2026/2027' });
+	const updated = await core.handle('max', '1', { callback: 'a:2 взрослых + 1 ребёнок' });
+	assert.match(updated.text, /Египет/);
+
+	const active = subscriptions.filter((item) => item.active);
+	assert.equal(active.length, 1);
+	assert.equal(active[0].params.destination, 'Египет');
+	assert.equal(active[0].params.departureCity, 'Казань');
+	assert.equal(active[0].consent.marketingConsent, true);
+});
+
+test('после остановки рассылки подписку можно оформить заново', async () => {
+	const { core } = makeCore();
+	await walkSubscription(core);
+	const stopped = await core.handle('max', '1', { callback: 'stop' });
+	assert.match(stopped.text, /остановлена/);
+	const fresh = await core.handle('max', '1', { callback: 'subscribe' });
+	assert.match(fresh.text, /согласие/);
 });

@@ -86,6 +86,43 @@ const managerPrompt = () => {
 	};
 };
 
+// Кнопки управления уже настроенной рассылкой горящих туров.
+const subscriptionButtons = () => [
+	[b('✏️ Изменить параметры', 'v4:sub:edit')],
+	[b('⏹ Остановить рассылку', 'stop')],
+	[b('🏠 В меню', 'menu')]
+];
+
+const subscriptionSummary = (params = {}) => [
+	params.departureCity ? `✈️ Вылет: ${params.departureCity}` : null,
+	params.destination ? `🌍 Направление: ${params.destination}` : null,
+	params.dates ? `📅 Даты: ${params.dates}` : null,
+	params.group ? `👨‍👩‍👧 Состав: ${params.group}` : null
+].filter(Boolean).join('\n');
+
+const activeSubscriptionCard = (params) => ({
+	text: [
+		'🔥 Рассылка горящих предложений у вас уже подключена.',
+		'',
+		'Сейчас подбираем по параметрам:',
+		subscriptionSummary(params) || 'Параметры не указаны',
+		'',
+		'Свежие варианты приходят до трёх раз в день. Повторно подписываться не нужно — можно изменить параметры или остановить рассылку.'
+	].join('\n'),
+	buttons: subscriptionButtons()
+});
+
+const subscriptionSavedCard = (params) => ({
+	text: [
+		'✅ Рассылка горящих предложений настроена.',
+		'',
+		subscriptionSummary(params) || 'Параметры не указаны',
+		'',
+		'Будем присылать подходящие варианты до трёх раз в день. Цена и наличие подтверждаются менеджером перед бронированием.'
+	].join('\n'),
+	buttons: [[b('🔎 Подобрать тур сейчас', 'qualify')], ...subscriptionButtons()]
+});
+
 const PHONE_RE = /(?:\+?7|8)?[\s\-()]*\d[\d\s\-()]{8,}/;
 const cleanName = (value) => value.replace(/[,;:.!?]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
 
@@ -112,6 +149,33 @@ export class BotCore extends BaseBotCore {
 	async setDepartureCity(key, session, departureCity) {
 		await this.patch(key, session, { state: 'destination', answers: { ...session.answers, departureCity } });
 		return destinationPrompt();
+	}
+
+	// Активная подписка этого пользователя, если она уже есть.
+	findSubscription(platform, userId) {
+		const list = this.v4Store.listSubscriptions?.() || [];
+		return list.filter((item) => item.platform === platform && String(item.userId) === String(userId)).pop() || null;
+	}
+
+	// Изменение параметров: согласие на рассылку уже получено, повторно не спрашиваем.
+	async startSubscriptionEdit(key, platform, userId) {
+		const existing = this.findSubscription(platform, userId);
+		const adsAt = existing?.consent?.receivedAt || new Date().toISOString();
+		await this.v4Store.saveBotSession(key, {
+			flow: 'sub',
+			state: '_departureSub',
+			answers: { ads: true, adsAt },
+			updatedAt: Date.now()
+		});
+		const prompt = cityPrompt();
+		return { ...prompt, text: `Обновим параметры рассылки.\n\n${prompt.text}` };
+	}
+
+	// Перед сохранением новых параметров отключаем прежние подписки,
+	// иначе одному человеку уходили бы дубли по старым и новым параметрам.
+	async subscription(key, platform, userId, session, value) {
+		if (session.state === 'group') await this.v4Store.deactivateSubscriptions?.(platform, userId);
+		return super.subscription(key, platform, userId, session, value);
 	}
 
 	async collectContacts(key, platform, userId, session, value) {
@@ -198,10 +262,11 @@ export class BotCore extends BaseBotCore {
 			this.v4Logger.error('Lead notification failed', { platform, leadId: String(lead.id), error: error.message });
 		}
 		await this.v4Store.clearBotSession(key);
+		const subscribed = Boolean(this.findSubscription(platform, userId));
 		return {
 			text: `✅ Спасибо! Заявка №${lead.id} принята. Менеджер подберёт варианты и свяжется с вами.`,
 			buttons: [
-				[b('🔥 Получать горящие предложения', 'subscribe')],
+				subscribed ? [b('🔥 Моя рассылка горящих', 'subscribe')] : [b('🔥 Получать горящие предложения', 'subscribe')],
 				[b('💬 Связаться с менеджером', 'manager')],
 				[b('🏠 В меню', 'menu')]
 			]
@@ -215,6 +280,17 @@ export class BotCore extends BaseBotCore {
 		const typed = String(input.text || '').trim();
 		const answerValue = action.startsWith('a:') ? action.slice(2) : typed;
 		const freeAnswer = (!action || action.startsWith('a:')) && !typed.startsWith('/');
+
+		// Повторное нажатие «Горящие предложения» не должно гонять человека
+		// по кругу с согласием: показываем уже сохранённые параметры.
+		if (action === 'subscribe' || typed.toLowerCase().startsWith('/hot')) {
+			const existing = this.findSubscription(platform, userId);
+			if (existing) {
+				await this.v4Store.clearBotSession(key);
+				return activeSubscriptionCard(existing.params);
+			}
+		}
+		if (action === 'v4:sub:edit') return this.startSubscriptionEdit(key, platform, userId);
 
 		if (action.startsWith('v4:city:')) {
 			const departureCity = action.slice(8);
@@ -259,6 +335,12 @@ export class BotCore extends BaseBotCore {
 		if (after?.state === 'wishes' && after.flow === 'lead') {
 			await this.patch(key, after, { state: CONTACTS_STATE, answers: { ...after.answers, wishes: '' } });
 			return contactsPrompt();
+		}
+
+		// Подтверждение подписки показываем вместе с сохранёнными параметрами.
+		if (output?.text?.startsWith('✅ Подписка настроена')) {
+			const saved = this.findSubscription(platform, userId);
+			return subscriptionSavedCard(saved?.params || { ...before?.answers, group: answerValue });
 		}
 
 		if (output?.text?.startsWith('Куда хотите отправиться')) return { ...output, ...destinationPrompt() };

@@ -99,6 +99,8 @@ export class BotCore extends BaseBotCore {
 		};
 		super({ ...deps, uon });
 		this.v4Store = deps.store;
+		this.rawUon = deps.uon;
+		this.v4Logger = deps.logger || console;
 	}
 
 	async patch(key, session, changes) {
@@ -134,31 +136,75 @@ export class BotCore extends BaseBotCore {
 				buttons: MENU
 			};
 		}
-		return this.createLead(key, platform, userId, answers);
+		return this.createLead(key, platform, userId, { ...session, answers });
 	}
 
-	async createLead(key, platform, userId, sessionAnswers) {
-		const { pd: personalConsent, travel: countryInfoAcknowledged, ...answers } = sessionAnswers;
-		const lead = await this.uon.createQualifiedLead({ ...answers, platform, messengerUserId: userId });
-		await this.v4Store.saveConsentEvidence({
-			receivedAt: new Date().toISOString(),
-			channel: platform,
-			messengerUserId: String(userId),
-			consentType: 'personal',
-			personalConsent: Boolean(personalConsent),
-			countryInfoAcknowledged: Boolean(countryInfoAcknowledged),
-			consentVersion: V,
-			privacyPolicyVersion: V,
-			travelInformationVersion: V,
-			uonLeadId: String(lead.id)
-		});
-		await this.notifier.notify(lead.id);
+	// Заявка в U-ON. Основной вызов — createQualifiedLead, резервный — тот же формат полей,
+	// что работает в разделе 1 (ветка VK, UonClient.createLead).
+	async createUonLead(platform, userId, answers) {
+		try {
+			return await this.uon.createQualifiedLead({ ...answers, platform, messengerUserId: userId });
+		} catch (error) {
+			this.v4Logger.error('U-ON qualified lead creation failed', { platform, userId: String(userId), error: error.message });
+			const lead = await this.rawUon.createLead({
+				name: answers.name,
+				phone: answers.phone,
+				email: answers.email,
+				destination: answers.destination || 'Не указано',
+				dates: answers.dates || 'Уточнить',
+				travelers: answers.group || 'Уточнить',
+				budget: answers.budget || BUDGET_PLACEHOLDER,
+				vkUserId: `${platform}:${userId} (город вылета: ${answers.departureCity || 'не указан'})`
+			});
+			this.v4Logger.warn('U-ON lead created with fallback payload', { platform, leadId: String(lead.id) });
+			return lead;
+		}
+	}
+
+	async createLead(key, platform, userId, session) {
+		const { pd: personalConsent, travel: countryInfoAcknowledged, ...answers } = session.answers;
+		let lead;
+		try {
+			lead = await this.createUonLead(platform, userId, answers);
+		} catch (error) {
+			this.v4Logger.error('U-ON lead creation failed', { platform, userId: String(userId), error: error.message });
+			await this.patch(key, session, { state: CONTACTS_STATE });
+			return {
+				text: 'Не удалось передать заявку менеджеру. Отправьте номер телефона ещё раз или позвоните нам: +7 (920) 124-20-33.',
+				buttons: [[b('💬 Связаться с менеджером', 'manager')], [b('🏠 В меню', 'menu')]]
+			};
+		}
+		// Согласие и уведомления не должны ломать уже созданную заявку.
+		try {
+			await this.v4Store.saveConsentEvidence({
+				receivedAt: new Date().toISOString(),
+				channel: platform,
+				messengerUserId: String(userId),
+				consentType: 'personal',
+				personalConsent: Boolean(personalConsent),
+				countryInfoAcknowledged: Boolean(countryInfoAcknowledged),
+				consentVersion: V,
+				privacyPolicyVersion: V,
+				travelInformationVersion: V,
+				uonLeadId: String(lead.id)
+			});
+		} catch (error) {
+			this.v4Logger.error('Consent evidence saving failed', { platform, leadId: String(lead.id), error: error.message });
+		}
+		try {
+			const delivery = await this.notifier.notify(lead.id);
+			if (delivery && delivery.ok === false) this.v4Logger.error('Lead notification delivery failed', { platform, leadId: String(lead.id), delivery });
+		} catch (error) {
+			this.v4Logger.error('Lead notification failed', { platform, leadId: String(lead.id), error: error.message });
+		}
 		await this.v4Store.clearBotSession(key);
 		return {
 			text: `✅ Спасибо! Заявка №${lead.id} принята. Менеджер подберёт варианты и свяжется с вами.`,
-			buttons: [[b('🔥 Получать горящие предложения', 'subscribe')], [b('💬 Связаться с менеджером', 'manager')], MENU[0][0]].map(
-				(row) => (Array.isArray(row) ? row : [row])
-			)
+			buttons: [
+				[b('🔥 Получать горящие предложения', 'subscribe')],
+				[b('💬 Связаться с менеджером', 'manager')],
+				[b('🏠 В меню', 'menu')]
+			]
 		};
 	}
 

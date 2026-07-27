@@ -2,9 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BotCore } from '../src/bot-core-v4.js';
 
-const makeCore = () => {
+const silentLogger = { warn: () => {}, error: () => {}, info: () => {} };
+
+const makeCore = (uonOverrides = {}) => {
 	const sessions = {};
 	const leads = [];
+	const fallbackLeads = [];
 	const store = {
 		touchBotUser: async () => {},
 		getBotSession: (k) => sessions[k] || null,
@@ -14,18 +17,27 @@ const makeCore = () => {
 		addSubscription: async () => {},
 		deactivateSubscriptions: async () => 0
 	};
-	const core = new BotCore({
-		store,
-		uon: { createQualifiedLead: async (t) => { leads.push(t); return { id: 777 }; } },
-		notifier: { notify: async () => {} }
-	});
-	return { core, store, leads };
+	const uon = {
+		createQualifiedLead: async (t) => { leads.push(t); return { id: 777 }; },
+		createLead: async (t) => { fallbackLeads.push(t); return { id: 888 }; },
+		...uonOverrides
+	};
+	const core = new BotCore({ store, uon, notifier: { notify: async () => ({ ok: true }) }, logger: silentLogger });
+	return { core, store, leads, fallbackLeads };
 };
 
 const startQualification = async (core) => {
 	await core.handle('max', '1', { callback: 'qualify' });
 	await core.handle('max', '1', { callback: 'consent:pd' });
 	return core.handle('max', '1', { callback: 'consent:travel' });
+};
+
+const walkToContacts = async (core) => {
+	await startQualification(core);
+	await core.handle('max', '1', { callback: 'v4:city:Москва' });
+	await core.handle('max', '1', { callback: 'a:Турция' });
+	await core.handle('max', '1', { callback: 'a:Осень-зима 2026/2027' });
+	return core.handle('max', '1', { callback: 'a:2 взрослых + 1 ребёнок' });
 };
 
 test('короткий сценарий: город, направление, даты, состав, имя и телефон', async () => {
@@ -63,6 +75,8 @@ test('короткий сценарий: город, направление, д�
 	assert.equal(leads[0].phone, '+79201242033');
 	assert.equal(leads[0].destination, 'Турция');
 	assert.equal(leads[0].dates, 'Осень-зима 2026/2027');
+	assert.equal(leads[0].platform, 'max');
+	assert.equal(String(leads[0].messengerUserId), '1');
 	assert.match(leads[0].wishes, /Город вылета: Москва/);
 });
 
@@ -77,6 +91,30 @@ test('имя и телефон принимаются одним сообщен�
 	assert.match(done.text, /Заявка №777/);
 	assert.equal(leads[0].name, 'Любовь');
 	assert.equal(leads[0].phone, '+79201242033');
+});
+
+test('если createQualifiedLead падает, заявка уходит в U-ON форматом раздела 1', async () => {
+	const { core, fallbackLeads } = makeCore({ createQualifiedLead: async () => { throw new Error('HTTP 422'); } });
+	await walkToContacts(core);
+	const done = await core.handle('max', '1', { text: 'Любовь +79201242033' });
+	assert.match(done.text, /Заявка №888/);
+	assert.equal(fallbackLeads.length, 1);
+	assert.equal(fallbackLeads[0].name, 'Любовь');
+	assert.equal(fallbackLeads[0].phone, '+79201242033');
+	assert.equal(fallbackLeads[0].travelers, '2 взрослых + 1 ребёнок');
+	assert.match(fallbackLeads[0].vkUserId, /max:1/);
+});
+
+test('при полном отказе U-ON сессия сохраняется для повтора', async () => {
+	const { core, store } = makeCore({
+		createQualifiedLead: async () => { throw new Error('HTTP 500'); },
+		createLead: async () => { throw new Error('HTTP 500'); }
+	});
+	await walkToContacts(core);
+	const failed = await core.handle('max', '1', { text: 'Любовь +79201242033' });
+	assert.match(failed.text, /Не удалось/);
+	assert.equal(store.getBotSession('max:1').state, '_contacts');
+	assert.equal(store.getBotSession('max:1').answers.phone, '+79201242033');
 });
 
 test('вариант «Другие даты» просит написать даты сообщением', async () => {

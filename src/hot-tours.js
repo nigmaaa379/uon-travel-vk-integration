@@ -11,8 +11,14 @@ const https = (value) => {
 	}
 };
 const norm = (value) => String(value ?? '').toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]+/g, ' ').trim();
+const describe = (value) => {
+	if (typeof value === 'string') return value;
+	if (value && typeof value === 'object') return text(value.message || value.text || value.description) || JSON.stringify(value);
+	return String(value ?? '');
+};
 
 const REFERENCE_TTL_MS = 86_400_000;
+const AUTH_HINT = 'проверьте TOURVISOR_LOGIN и TOURVISOR_PASSWORD';
 const TOUR_KEYS = ['price', 'tourprice', 'amount', 'hotelname', 'hotel', 'countryname'];
 
 const CITY_ALIASES = {
@@ -31,10 +37,7 @@ const COUNTRY_ALIASES = {
 // Формат ответа Турвизора отличается между методами, поэтому ищем массив туров на любом уровне.
 function findRows(node, depth = 0) {
 	if (!node || typeof node !== 'object' || depth > 6) return [];
-	if (Array.isArray(node)) {
-		const rows = node.filter((item) => item && typeof item === 'object' && TOUR_KEYS.some((key) => key in item));
-		return rows;
-	}
+	if (Array.isArray(node)) return node.filter((item) => item && typeof item === 'object' && TOUR_KEYS.some((key) => key in item));
 	for (const value of Object.values(node)) {
 		const rows = findRows(value, depth + 1);
 		if (rows.length) return rows;
@@ -95,9 +98,16 @@ export class TourvisorClient {
 		try {
 			data = body ? JSON.parse(body) : {};
 		} catch {
+			// При неверных доступах Турвизор отвечает простым текстом Authorization Error.
+			if (/authoriz/i.test(body)) throw new Error(`Tourvisor authorization failed: ${AUTH_HINT}`);
 			throw new Error(`Tourvisor returned a non-JSON response: ${body.slice(0, 200)}`);
 		}
-		if (data?.error || data?.result?.error) throw new Error(`Tourvisor error: ${text(data.error || data.result.error)}`);
+		const error = data?.error ?? data?.result?.error;
+		if (error) {
+			const message = describe(error);
+			if (/authoriz|авториз|логин|парол/i.test(message)) throw new Error(`Tourvisor authorization failed: ${message} (${AUTH_HINT})`);
+			throw new Error(`Tourvisor error: ${message}`);
+		}
 		return data;
 	}
 
@@ -125,7 +135,7 @@ export class TourvisorClient {
 				|| items.find((item) => norm(item.name).startsWith(candidate) || candidate.startsWith(norm(item.name)));
 			if (hit) return String(hit.id);
 		}
-		this.logger.warn?.('Tourvisor code not resolved', { type, value: text(value) });
+		if (items.length) this.logger.warn?.('Tourvisor code not resolved', { type, value: text(value) });
 		return '';
 	}
 
@@ -215,7 +225,8 @@ export class HotToursScheduler {
 	}
 
 	async run() {
-		for (const sub of this.store.listSubscriptions()) {
+		const subscriptions = this.store.listSubscriptions();
+		for (const sub of subscriptions) {
 			try {
 				const offers = await this.tourvisor.search(sub.params);
 				const unseen = offers.filter((offer) => !(sub.sentOfferIds || []).includes(offer.id));
@@ -232,7 +243,12 @@ export class HotToursScheduler {
 				}
 				await this.store.markSubscriptionSent(sub.id, unseen.map((offer) => offer.id));
 			} catch (error) {
-				this.logger.error('Subscription failed', { subscriptionId: sub.id, error: error.message });
+				this.logger.error('Subscription failed', { subscriptionId: sub.id, platform: sub.platform, error: error.message });
+				// Если доступы Турвизора неверны, остальные подписки обрабатывать бессмысленно.
+				if (/authorization failed/i.test(error.message)) {
+					this.logger.error('Hot tours run stopped: Tourvisor credentials are invalid', { pending: subscriptions.length });
+					return;
+				}
 			}
 		}
 	}

@@ -31,7 +31,46 @@
 			: `<button type="button" class="sales-accent-link" data-accent-request="1">${button}</button>`
 		return `<article class="sales-accent${image ? ' has-media' : ''}">${media}<div class="sales-accent-body"><span class="sales-accent-label">${esc(item.label)}</span><h3>${title}</h3><p>${esc(item.text)}</p>${action}</div></article>`
 	}
+	const hasCruiseLink = scope => Boolean(scope && scope.querySelector('a[href*="cruises"]'))
+	const addNavLink = () => {
+		const nav = document.querySelector('header nav') || document.querySelector('.nav') || document.querySelector('#main-nav')
+		if (!nav || hasCruiseLink(nav)) return
+		const links = nav.querySelectorAll('a')
+		if (!links.length) return
+		const sample = links[0]
+		const link = sample.cloneNode(false)
+		link.setAttribute('href', '/cruises.html')
+		link.removeAttribute('aria-current')
+		link.textContent = 'Круизы'
+		const parent = sample.parentElement
+		if (parent && parent !== nav && parent.tagName === 'LI') {
+			const item = parent.cloneNode(false)
+			item.appendChild(link)
+			parent.parentElement.insertBefore(item, parent.nextSibling)
+			return
+		}
+		sample.insertAdjacentElement('afterend', link)
+	}
+	const addFooterLink = () => {
+		const footer = document.querySelector('footer')
+		if (!footer || hasCruiseLink(footer)) return
+		const sample = footer.querySelector('a[href^="/"]:not([href^="//"])')
+		if (!sample) return
+		const link = sample.cloneNode(false)
+		link.setAttribute('href', '/cruises.html')
+		link.textContent = 'Морские круизы'
+		const parent = sample.parentElement
+		if (parent && parent.tagName === 'LI') {
+			const item = parent.cloneNode(false)
+			item.appendChild(link)
+			parent.parentElement.insertBefore(item, parent.nextSibling)
+			return
+		}
+		sample.insertAdjacentElement('afterend', link)
+	}
 	addEventListener('DOMContentLoaded', async () => {
+		try { addNavLink() } catch {}
+		try { addFooterLink() } catch {}
 		const rail = document.querySelector('.sales-rail')
 		if (!rail) return
 		rail.addEventListener('click', event => {

@@ -31,10 +31,9 @@
 			: `<button type="button" class="sales-accent-link" data-accent-request="1">${button}</button>`
 		return `<article class="sales-accent${image ? ' has-media' : ''}">${media}<div class="sales-accent-body"><span class="sales-accent-label">${esc(item.label)}</span><h3>${title}</h3><p>${esc(item.text)}</p>${action}</div></article>`
 	}
-	const hasCruiseLink = scope => Boolean(scope && scope.querySelector('a[href*="cruises"]'))
 	const addNavLink = () => {
-		const nav = document.querySelector('header nav') || document.querySelector('.nav') || document.querySelector('#main-nav')
-		if (!nav || hasCruiseLink(nav)) return
+		const nav = document.getElementById('main-nav') || document.querySelector('header nav')
+		if (!nav || nav.querySelector('a[href*="cruises"]')) return
 		const links = nav.querySelectorAll('a')
 		if (!links.length) return
 		const sample = links[0]
@@ -42,49 +41,54 @@
 		link.setAttribute('href', '/cruises.html')
 		link.removeAttribute('aria-current')
 		link.textContent = 'Круизы'
-		const parent = sample.parentElement
-		if (parent && parent !== nav && parent.tagName === 'LI') {
-			const item = parent.cloneNode(false)
-			item.appendChild(link)
-			parent.parentElement.insertBefore(item, parent.nextSibling)
-			return
-		}
 		sample.insertAdjacentElement('afterend', link)
 	}
 	const addFooterLink = () => {
+		const columns = document.querySelectorAll('footer .footer-grid > div')
 		const footer = document.querySelector('footer')
-		if (!footer || hasCruiseLink(footer)) return
-		const sample = footer.querySelector('a[href^="/"]:not([href^="//"])')
+		if (!footer || footer.querySelector('a[href*="cruises"]')) return
+		const contacts = columns[1]
+		if (!contacts) return
+		const sample = contacts.querySelector('a')
 		if (!sample) return
 		const link = sample.cloneNode(false)
 		link.setAttribute('href', '/cruises.html')
 		link.textContent = 'Морские круизы'
-		const parent = sample.parentElement
-		if (parent && parent.tagName === 'LI') {
-			const item = parent.cloneNode(false)
-			item.appendChild(link)
-			parent.parentElement.insertBefore(item, parent.nextSibling)
-			return
-		}
-		sample.insertAdjacentElement('afterend', link)
+		contacts.appendChild(link)
 	}
-	addEventListener('DOMContentLoaded', async () => {
-		try { addNavLink() } catch {}
-		try { addFooterLink() } catch {}
-		const rail = document.querySelector('.sales-rail')
-		if (!rail) return
+	const whenRail = callback => {
+		const found = document.querySelector('.sales-rail')
+		if (found) { callback(found); return }
+		const observer = new MutationObserver(() => {
+			const rail = document.querySelector('.sales-rail')
+			if (!rail) return
+			observer.disconnect()
+			callback(rail)
+		})
+		observer.observe(document.body, { childList: true, subtree: true })
+		setTimeout(() => observer.disconnect(), 15000)
+	}
+	const render = (rail, items) => {
+		rail.innerHTML = items.slice(0, 3).map(card).join('')
+		if (rail.dataset.accentsBound === '1') return
+		rail.dataset.accentsBound = '1'
 		rail.addEventListener('click', event => {
 			const trigger = event.target.closest('[data-accent-request]')
 			if (!trigger) return
 			event.preventDefault()
 			openRequest()
 		})
+	}
+	addEventListener('DOMContentLoaded', async () => {
+		try { addNavLink() } catch {}
+		try { addFooterLink() } catch {}
+		let items = null
 		try {
 			const response = await fetch('/data/sales-accents.json', { cache: 'no-cache' })
 			if (!response.ok) return
-			const items = await response.json()
-			if (!Array.isArray(items) || !items.length) return
-			rail.innerHTML = items.slice(0, 3).map(card).join('')
-		} catch {}
+			items = await response.json()
+		} catch { return }
+		if (!Array.isArray(items) || !items.length) return
+		whenRail(rail => render(rail, items))
 	})
 })();

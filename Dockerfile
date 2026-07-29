@@ -3,6 +3,7 @@ RUN apk add --no-cache msmtp ca-certificates
 WORKDIR /app
 COPY package.json ./
 COPY src ./src
+COPY scripts ./scripts
 COPY web ./web
 RUN mkdir -p /app/data && chown -R node:node /app
 USER node

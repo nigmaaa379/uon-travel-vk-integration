@@ -508,6 +508,188 @@ dialog h2 {
     padding-top: 14px
 }
 
+.review-head {
+    display: grid;
+    gap: 28px;
+    align-items: end;
+    margin-bottom: 44px
+}
+
+.review-head h2 {
+    font: 500 clamp(2.2rem, 6vw, 4rem)/1.02 'Cormorant Garamond', serif;
+    margin: 6px 0;
+    text-wrap: balance
+}
+
+.review-head h2 em {
+    font-family: 'Marck Script';
+    font-weight: 400;
+    font-style: normal;
+    color: #ffb15f
+}
+
+.review-intro {
+    color: #bfe0e6;
+    max-width: 46ch;
+    margin: 0
+}
+
+.review-rating p {
+    color: #bfe0e6;
+    font-size: .9rem;
+    margin: 4px 0 14px;
+    max-width: 30ch
+}
+
+.review-rating iframe {
+    border-radius: 10px;
+    background: white
+}
+
+.reviews-grid {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 22px;
+    align-items: start
+}
+
+.rev {
+    position: relative;
+    background: white;
+    color: var(--ink);
+    border-radius: var(--radius);
+    padding: 30px 26px 24px;
+    box-shadow: 0 14px 34px rgba(3, 32, 40, .22);
+    overflow-wrap: break-word
+}
+
+.rev-mark {
+    position: absolute;
+    top: 4px;
+    right: 22px;
+    margin: 0;
+    font: 500 5.5rem/1 'Cormorant Garamond', serif;
+    color: rgba(5, 127, 156, .16);
+    pointer-events: none
+}
+
+.rev-lead {
+    position: relative;
+    margin: 0;
+    font: italic 500 1.3rem/1.4 'Cormorant Garamond', serif
+}
+
+.rev-more {
+    margin-top: 4px
+}
+
+.rev-more>summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 18px;
+    cursor: pointer;
+    list-style: none;
+    color: var(--orange2);
+    font-size: .88rem;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(217, 95, 0, .35);
+    width: fit-content
+}
+
+.rev-more>summary::-webkit-details-marker {
+    display: none
+}
+
+.rev-more>summary::after {
+    content: '▾';
+    font-size: .75rem;
+    transition: transform .2s
+}
+
+.rev-more[open]>summary::after {
+    transform: rotate(180deg)
+}
+
+.rev-more>summary:hover,
+.rev-more>summary:focus-visible {
+    color: var(--orange)
+}
+
+.rev-close,
+.rev-more[open] .rev-open {
+    display: none
+}
+
+.rev-more[open] .rev-close {
+    display: inline
+}
+
+.rev-body {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: .95rem;
+    color: #35555e
+}
+
+.rev-body p {
+    margin: 0 0 12px
+}
+
+.rev-body p:last-child {
+    margin-bottom: 0
+}
+
+.rev-ps {
+    background: #f2fbfc;
+    border-left: 3px solid var(--aqua);
+    border-radius: 0 10px 10px 0;
+    padding: 12px 14px;
+    font-style: italic
+}
+
+.rev-ps b {
+    display: block;
+    font-style: normal;
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+    margin-bottom: 5px
+}
+
+.rev-by {
+    display: flex;
+    flex-direction: column;
+    margin-top: 22px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line)
+}
+
+.rev-by b {
+    font-size: 1rem
+}
+
+.rev-by span {
+    color: var(--muted);
+    font-size: .82rem;
+    text-transform: uppercase;
+    letter-spacing: .08em
+}
+
+.review-note {
+    margin: 34px 0 0;
+    font-size: .85rem;
+    color: #9fcbd4
+}
+
+.review-note a {
+    color: #ffb15f
+}
+
 .lead-card {
     background: white;
     padding: 28px;
@@ -795,6 +977,18 @@ dialog::backdrop {
         grid-template-columns: 1fr 1fr
     }
 
+    .review-head {
+        grid-template-columns: 1.35fr .65fr
+    }
+
+    .reviews-grid {
+        grid-template-columns: repeat(2, 1fr)
+    }
+
+    .rev {
+        padding: 34px 30px 26px
+    }
+
     .lead-card {
         grid-template-columns: .8fr 1.2fr;
         padding: 48px
@@ -824,6 +1018,10 @@ dialog::backdrop {
 }
 
 @media(min-width:1024px) {
+    .reviews-grid {
+        grid-template-columns: repeat(3, 1fr)
+    }
+
     .head {
         min-height: 108px
     }

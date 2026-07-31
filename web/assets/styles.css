@@ -766,13 +766,7 @@ dialog::backdrop {
     border: 1px solid var(--line);
     border-radius: var(--radius);
     padding: 32px 24px;
-    box-shadow: var(--shadow);
-    overflow: hidden;
-    min-height: 120px
-}
-
-.tripster-widget:empty {
-    display: none
+    box-shadow: var(--shadow)
 }
 
 @media(min-width:700px) {

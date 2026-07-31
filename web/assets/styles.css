@@ -542,8 +542,13 @@ dialog h2 {
 }
 
 .review-rating iframe {
+    border: 0;
     border-radius: 10px;
-    background: white
+    background: transparent
+}
+
+.review-rating iframe:not([src]) {
+    display: none
 }
 
 .reviews-grid {
@@ -552,11 +557,13 @@ dialog h2 {
     margin: 0;
     display: grid;
     gap: 22px;
-    align-items: start
+    align-items: stretch
 }
 
 .rev {
     position: relative;
+    display: flex;
+    flex-direction: column;
     background: white;
     color: var(--ink);
     border-radius: var(--radius);
@@ -582,7 +589,8 @@ dialog h2 {
 }
 
 .rev-more {
-    margin-top: 4px
+    margin-top: 4px;
+    flex: 0 0 auto
 }
 
 .rev-more>summary {
@@ -664,8 +672,10 @@ dialog h2 {
 .rev-by {
     display: flex;
     flex-direction: column;
-    margin-top: 22px;
-    padding-top: 16px;
+    margin-top: auto;
+    padding: 16px 0 0;
+    background: none;
+    color: var(--ink);
     border-top: 1px solid var(--line)
 }
 

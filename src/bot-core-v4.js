@@ -265,6 +265,7 @@ export class BotCore extends BaseBotCore {
 		}
 		try {
 			const delivery = await this.v4Store.saveBotUserProfile?.(platform, userId, { ...answers, lastLeadId: lead.id });
+		await this.v4Store.completeBotFunnel?.(platform, userId, { leadId: lead.id, kind: 'обращение создано' });
 		await this.notifier.notify(lead.id);
 			if (delivery && delivery.ok === false) this.v4Logger.error('Lead notification delivery failed', { platform, leadId: String(lead.id), delivery });
 		} catch (error) {
@@ -285,10 +286,32 @@ export class BotCore extends BaseBotCore {
 	async handle(platform, userId, input = {}) {
 		const key = `${platform}:${userId}`;
 		const before = this.v4Store.getBotSession(key);
+		const pressed = String(input.callback || '');
+		const text = String(input.text || '').trim();
+		// Журнал шагов для панели: кнопки пишем как есть, свободный текст —
+		// только пометкой, чтобы имя и телефон не попали в лог.
+		await this.v4Store.logBotEvent?.(platform, userId, {
+			flow: before?.flow || '',
+			step: before?.state || 'menu',
+			action: pressed || (text.startsWith('/') ? text.slice(0, 40) : (text ? 'свободный ответ' : ''))
+		});
+		const output = await this.handleStep(platform, userId, input);
+		const after = this.v4Store.getBotSession(key);
+		await this.v4Store.setBotFunnelStep?.(platform, userId, { flow: after?.flow || '', step: after?.state || 'menu' });
+		return output;
+	}
+
+	async handleStep(platform, userId, input = {}) {
+		const key = `${platform}:${userId}`;
+		const before = this.v4Store.getBotSession(key);
 		const action = String(input.callback || '');
+		if (action === 'stop' || String(input.text || '').trim().toLowerCase().startsWith('/stop')) {
+			await this.v4Store.markBotReminder?.(platform, userId, { off: true });
+		}
 		const typed = String(input.text || '').trim();
 		const answerValue = action.startsWith('a:') ? action.slice(2) : typed;
 		const freeAnswer = (!action || action.startsWith('a:')) && !typed.startsWith('/');
+
 
 		// Повторное нажатие «Горящие предложения» не должно гонять человека
 		// по кругу с согласием: показываем уже сохранённые параметры.
@@ -349,6 +372,7 @@ export class BotCore extends BaseBotCore {
 		// Подтверждение подписки показываем вместе с сохранёнными параметрами.
 		if (output?.text?.startsWith('✅ Подписка настроена')) {
 			const saved = this.findSubscription(platform, userId);
+			await this.v4Store.completeBotFunnel?.(platform, userId, { kind: 'подписка оформлена' });
 			return subscriptionSavedCard(saved?.params || { ...before?.answers, group: answerValue });
 		}
 

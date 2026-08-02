@@ -34,7 +34,7 @@ async function saveReviews(){const button=$('save-reviews');button.disabled=true
 $('save-reviews').addEventListener('click',saveReviews);$('reviews-form').addEventListener('submit',event=>{event.preventDefault();saveReviews()});
 const CONSENT_LABELS={personalConsent:'Персональные данные',marketingConsent:'Рекламные сообщения',countryInfoAcknowledged:'Правила по стране'};
 function consentWhen(value){if(!value)return '—';const date=new Date(value);return Number.isNaN(date.getTime())?escapeHtml(value):date.toLocaleString('ru-RU')}
-function consentSource(record){const type=escapeHtml(record.formType||'—');const page=escapeHtml(record.formPage||'');return page?`${type}<div class="mono">${page}</div>`:type}
+function consentSource(record){const type=escapeHtml(record.formType||'—');const page=escapeHtml(record.formPage||'');const from=escapeHtml(record.source||'');return `${type}${page?`<div class="mono">${page}</div>`:''}${from?`<div class="muted">${from}</div>`:''}`}
 function consentFlags(record){return Object.entries(CONSENT_LABELS).map(([field,label])=>`<span class="flag ${record[field]?'yes':'no'}">${record[field]?'✓':'—'} ${label}</span>`).join('')}
 function consentVersions(record){const rows=[['Согласие',record.consentVersion],['Политика',record.privacyPolicyVersion],['Правила въезда',record.travelInformationVersion]];return rows.filter(([,v])=>v).map(([k,v])=>`${k}: ${escapeHtml(v)}`).join('<br>')||'—'}
 function shortHash(value){return value?`<div class="mono">${escapeHtml(String(value).slice(0,12))}…</div>`:''}

@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { funnelRows } from './bot-funnel.js';
 
 const EMPTY={employees:[],clientMeta:{},segments:[],campaigns:[]};
 const ROLES={head:['employees','clients','segments','broadcasts'],specialist:['clients','segments','broadcasts'],manager:['clients']};
@@ -46,6 +47,7 @@ export class BotAdminService{
   if(url.pathname==='/api/bot-admin/employees'){if(!need('employees'))return true;if(req.method==='GET'){json(res,200,{ok:true,employees:this.data.listEmployees()});return true}if(req.method==='POST'){json(res,200,{ok:true,employee:await this.data.saveEmployee(await readJson(req))});return true}}
   if(req.method==='DELETE'&&url.pathname.startsWith('/api/bot-admin/employees/')){if(!need('employees'))return true;json(res,200,{ok:await this.data.deleteEmployee(url.pathname.split('/').pop())});return true}
   if(url.pathname==='/api/bot-admin/clients'){if(!need('clients'))return true;if(req.method==='GET'){const filters=Object.fromEntries(url.searchParams);json(res,200,{ok:true,clients:this.filterClients(filters),subscribers:this.broadcastRecipients(filters).length});return true}if(req.method==='POST'){const body=await readJson(req);if(!/^\w+:.+/.test(body.key||''))throw new Error('Некорректный клиент.');json(res,200,{ok:true,client:await this.data.updateClient(body.key,body)});return true}}
+  if(req.method==='GET'&&url.pathname==='/api/bot-admin/funnel'){if(!need('clients'))return true;const rows=funnelRows(this.store.listBotUsers?.()||[]);const only=url.searchParams.get('state')||'';const filtered=only==='abandoned'?rows.filter(r=>r.abandoned):only==='completed'?rows.filter(r=>r.completedAt):rows;json(res,200,{ok:true,rows:filtered,total:rows.length,abandoned:rows.filter(r=>r.abandoned).length,completed:rows.filter(r=>r.completedAt).length});return true}
   if(url.pathname==='/api/bot-admin/segments'){if(!need('segments'))return true;if(req.method==='GET'){json(res,200,{ok:true,segments:this.data.listSegments()});return true}if(req.method==='POST'){json(res,200,{ok:true,segment:await this.data.saveSegment(await readJson(req))});return true}}
   if(req.method==='DELETE'&&url.pathname.startsWith('/api/bot-admin/segments/')){if(!need('segments'))return true;json(res,200,{ok:await this.data.deleteSegment(url.pathname.split('/').pop())});return true}
   if(req.method==='GET'&&url.pathname==='/api/bot-admin/campaigns'){if(!need('broadcasts'))return true;json(res,200,{ok:true,campaigns:this.data.listCampaigns()});return true}

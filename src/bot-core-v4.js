@@ -264,7 +264,8 @@ export class BotCore extends BaseBotCore {
 			this.v4Logger.error('Consent evidence saving failed', { platform, leadId: String(lead.id), error: error.message });
 		}
 		try {
-			const delivery = await this.notifier.notify(lead.id);
+			const delivery = await this.v4Store.saveBotUserProfile?.(platform, userId, { ...answers, lastLeadId: lead.id });
+		await this.notifier.notify(lead.id);
 			if (delivery && delivery.ok === false) this.v4Logger.error('Lead notification delivery failed', { platform, leadId: String(lead.id), delivery });
 		} catch (error) {
 			this.v4Logger.error('Lead notification failed', { platform, leadId: String(lead.id), error: error.message });

@@ -1,6 +1,6 @@
 import{readFile}from'node:fs/promises';import{join}from'node:path';import{createHmac,randomUUID}from'node:crypto';const json=(r,s,p)=>{r.writeHead(s,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});r.end(JSON.stringify(p))};async function body(q){const c=[];let z=0;for await(const x of q){z+=x.length;if(z>1e6)throw Error('Payload too large');c.push(x)}return JSON.parse(Buffer.concat(c).toString('utf8')||'{}')}
 export const ASSET_VERSION='20260804-1';
-const CONTACT_CHANNELS=['WhatsApp','Telegram','MAX','ВКонтакте','Только звонок','Email'];
+const CONTACT_CHANNELS=['ВКонтакте','MAX','Telegram','WhatsApp','Только звонок, без мессенджеров','Только звонок','Email'];
 const CONTACT_TIMES=['Утром, 10:00–13:00','Днём, 13:00–16:00','Вечером, 16:00–19:00'];
 // Способ связи и удобное время ставим первыми строками: менеджер видит их сразу.
 function describeContact(d){const pick=(value,allowed)=>{const raw=String(value==null?'':value).trim();return allowed.includes(raw)?raw:''};const channel=pick(d.messenger,CONTACT_CHANNELS),time=pick(d.contactTime,CONTACT_TIMES);const lines=[];if(channel)lines.push(`Связь: ${channel}`);lines.push(time?`Удобное время: ${time}`:'Удобное время: любое рабочее');return{channel,time,text:lines.join('\n'),summary:[channel||'способ не указан',time||'время любое'].join(' · ')}}

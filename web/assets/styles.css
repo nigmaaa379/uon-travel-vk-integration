@@ -767,6 +767,25 @@ dialog h2 {
     color: var(--muted)
 }
 
+.inst-cta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin-top: 26px
+}
+
+.inst-cta .btn {
+    text-decoration: none
+}
+
+.inst-cta-note {
+    margin: 0;
+    max-width: 42ch;
+    font-size: .86rem;
+    color: var(--muted)
+}
+
 .inst-more {
     margin-top: 22px
 }

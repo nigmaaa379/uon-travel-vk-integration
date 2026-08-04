@@ -1,4 +1,4 @@
-import test from'node:test';import assert from'node:assert/strict';import{readFile,mkdtemp}from'node:fs/promises';import{tmpdir}from'node:os';import{join}from'node:path';
+import test from'node:test';import assert from'node:assert/strict';import{readFile,mkdtemp}from'node:fs/promises';import{readFileSync}from'node:fs';import{tmpdir}from'node:os';import{join}from'node:path';
 import{JsonStore}from'../src/store.js';import{SiteComplianceService}from'../src/site-compliance.js';
 const html=await readFile(new URL('../web/index.html',import.meta.url),'utf8');const css=await readFile(new URL('../web/assets/styles.css',import.meta.url),'utf8');
 const completion=await readFile(new URL('../web/assets/completion.js',import.meta.url),'utf8');
@@ -46,3 +46,13 @@ assert.ok(refund.includes('/legal/payment.html'),'Из возврата долж
 
 test('the block is reachable from the menu',()=>{assert.ok(html.includes('href="#installment">Рассрочка'),'Нет пункта меню');
 assert.ok(html.indexOf('id="installment"')<html.indexOf('lead-card'),'Блок должен идти перед формой заявки')});
+
+test('the block has a working call to action',()=>{const cta=section.slice(section.indexOf('class="inst-cta"'),section.indexOf('</div>',section.indexOf('inst-cta-note')));
+assert.match(cta,/Оформить тур в кредит/,'Нет кнопки оформления');
+assert.match(cta,/href="#lead-form"/,'Без JS кнопка должна вести к форме заявки');
+assert.match(cta,/data-open-modal="tour-request"/,'С JS кнопка должна открывать форму заявки');
+assert.match(cta,/data-installment/,'Кнопка должна помечать заявку как кредитную');
+assert.ok(html.includes('id="lead-form"'),'Нет якоря формы заявки');
+const siteJs=readFileSync(new URL('../web/assets/app.js',import.meta.url),'utf8');
+assert.match(siteJs,/dataset\.installment/,'Обработчик не отмечает галочку рассрочки');
+assert.match(siteJs,/event\.preventDefault\(\)/,'Ссылка-кнопка не должна прыгать к форме, когда открывается модальное окно')});

@@ -700,6 +700,187 @@ dialog h2 {
     color: #ffb15f
 }
 
+.inst-grid {
+    display: grid;
+    gap: 22px;
+    align-items: start
+}
+
+.inst-facts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px
+}
+
+.inst-facts li {
+    background: #f2fbfc;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column
+}
+
+.inst-facts b {
+    font: 500 1.55rem/1.1 'Cormorant Garamond', serif;
+    color: var(--deep)
+}
+
+.inst-facts span {
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--muted);
+    margin-top: 4px
+}
+
+.inst-rate {
+    background: white;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow)
+}
+
+/* 353-ФЗ: ставка и диапазон ПСК набираются одинаковым шрифтом. */
+.inst-rate-line,
+.inst-rate-line b {
+    font-family: Manrope, Arial, sans-serif;
+    font-size: 1rem;
+    line-height: 1.5
+}
+
+.inst-rate-line {
+    margin: 0 0 10px;
+    color: var(--ink)
+}
+
+.inst-rate-line b {
+    font-weight: 700
+}
+
+.inst-note {
+    margin: 12px 0 0;
+    font-size: .88rem;
+    color: var(--muted)
+}
+
+.inst-more {
+    margin-top: 22px
+}
+
+.inst-more>summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    list-style: none;
+    width: fit-content;
+    color: var(--orange2);
+    font-weight: 600;
+    font-size: .92rem;
+    border-bottom: 1px solid rgba(217, 95, 0, .35)
+}
+
+.inst-more>summary::-webkit-details-marker {
+    display: none
+}
+
+.inst-more>summary::after {
+    content: '▾';
+    font-size: .75rem;
+    transition: transform .2s
+}
+
+.inst-more[open]>summary::after {
+    transform: rotate(180deg)
+}
+
+.inst-close,
+.inst-more[open] .inst-open {
+    display: none
+}
+
+.inst-more[open] .inst-close {
+    display: inline
+}
+
+.inst-details {
+    display: grid;
+    gap: 22px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line)
+}
+
+.inst-details h3 {
+    margin: 0 0 8px;
+    font: 600 .82rem/1.3 Manrope, Arial, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--orange2)
+}
+
+.inst-details p,
+.inst-details li {
+    font-size: .93rem
+}
+
+.inst-details p {
+    margin: 0 0 8px
+}
+
+.inst-details ul,
+.inst-details ol {
+    margin: 0;
+    padding-left: 20px
+}
+
+.inst-details li {
+    padding: 2px 0
+}
+
+.inst-legal {
+    margin: 22px 0 0;
+    font-size: .84rem;
+    color: var(--muted)
+}
+
+.pay-choice {
+    background: #f2fbfc;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--aqua);
+    border-radius: 0 10px 10px 0;
+    padding: 12px 14px;
+    margin-bottom: 14px
+}
+
+.pay-choice label {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 8px;
+    align-items: start;
+    line-height: 1.35;
+    font-size: .86rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: pointer
+}
+
+/* Глобальное правило input{width:100%} растянуло бы галочку на всю форму. */
+.pay-choice input[type=checkbox] {
+    width: 18px;
+    height: 18px;
+    min-height: 0;
+    margin: 1px 0;
+    padding: 0;
+    border-radius: 4px;
+    accent-color: var(--orange)
+}
+
 .lead-card {
     background: white;
     padding: 28px;
@@ -993,6 +1174,18 @@ dialog::backdrop {
 
     .reviews-grid {
         grid-template-columns: repeat(2, 1fr)
+    }
+
+    .inst-grid {
+        grid-template-columns: 1fr 1fr
+    }
+
+    .inst-facts {
+        grid-template-columns: 1fr 1fr
+    }
+
+    .inst-details {
+        grid-template-columns: 1fr 1fr
     }
 
     .rev {
